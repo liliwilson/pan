@@ -1,0 +1,84 @@
+Traverse path of imports
+
+1. labgob
+  - My understanding is that this just makes sure that
+    things in the lab are able to work in Go’s RPC library
+  - Depends on nothing; root of the 6.5840 infra
+
+2. models1
+  - I THINK this creates the porcupine visualizations;
+    so maybe not important for us
+  - Depends on nothing; root of 6.5840 infra
+
+3. labrpc
+  - Simulates a network that can be sus
+  - Depends on labgob (1)
+
+4. tester
+  - This is a package, so we go through each of the modules
+
+4A. tester/annotation
+  - Deals with porcupine; skipping for now
+  - Depends on models1 (2)
+
+4B. tester/clnts
+  - Creates clnts, which define which servers clerks can
+    talk to. may not be real clients
+  - Depends on labrpc (3)
+
+4C. tester/config
+  - Creates a specific test; contains code to specify
+    whether net is reliable, number of servers, &c
+  - Depends on labrpc (3)
+
+4D. tester/group
+  - Each test can have groups of servers (example given
+    is one group per Raft group). Also contains SrvGrp,
+    which specifies 1 group of servers. Contains functions
+    to (dis)connect and start/shutdown servers in group.
+  - Depends on labrpc (3)
+
+4E. tester/persister
+  - This is used for the persistent raft state. Didn't look
+    that much
+  - Depends on nothing
+
+4F. tester/srv
+  - Has creation + helper functions for individual servers.
+    I THINK makeServer creates a bunch of connections
+    between servers in the same group.
+    connect and disconnect let this server talk to other
+    specified servers
+  - Depends on labrpc (3)
+
+5. kvtest
+  - Various operations for checking a key-value server. i.e. puts
+    occur at least once, checks work as expected, &c
+  - Depends on tester1 (4) and kv rpcs (kvsrv1/rpc)
+
+6A. rsm/test
+  - Various operations for testing rsm
+  - Depends on kv rpcs (kvsrv1/rpc), labrpc (3), raftapi (raft
+    spec), and tester1 (4)
+
+6B. rsm/rsm_test
+  - Contains the actual tests. Uses the operations defined in 6A
+  - Depends on kv rpcs (kvsrv1/rpc) and tester1 (4)
+
+7A. kvraft1/test.go: LOOK MORE HERE FOR HOW TO SET UP VARIOUS NETS
+  - Ops to create clerk, server, and start and stop them.
+  - Depends on kvtest (5), labrpc (3), and tester1 (4)
+
+7B. kvraft1/kvraft_test.go
+  - Run tests
+  - Depends on rsm (6), kv rpcs (kvsrv1/rpc), kvtest (5), and
+    tester1 (4).
+
+OVERARCHING:
+  - All tests have a test.go script for common operations relating
+    to the thing being tested, and a (name)_test.go for the
+    specific tests
+
+GLOSSARY:
+  - ClientEnd: I THINK this simulates a single point a to 
+               point b network connection
