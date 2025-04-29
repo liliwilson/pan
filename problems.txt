@@ -1,0 +1,5 @@
+Sets don't exist in go -> sorted list by child name
+Can we create to directories in one go? e.g. if empty dir, does create(/a/b) create both /a and /a/b?
+How to check if client is still alive? How can we test for this? maybe clerk needs state?
+Similarly, how to tell when client is gone? only raft leader can write to fs, if raft peer cannot communicate, what then?
+Can servers communicate to each other? This would be helpful for above (to tell the raft leader to remove ephemeral znodes relating to a client) and for sync (to tell leader to write no-op)? I think we have to have ZK servers communicate, because of only leader writes.

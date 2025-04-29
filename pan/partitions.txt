@@ -1,0 +1,6 @@
+1. All ops (except sync) with no failures; Create uses no flags
+2. Sequential Znodes with no failures
+3. Ephemeral Znodes with c
+4 and beyond. Figure out net failures
+
+IF TIME: Check for linearizability
