@@ -3,7 +3,7 @@ package pan
 import (
 	"testing"
 
-	"6.5840/panapi"
+	"pan/panapi"
 	"6.5840/labrpc"
 	"6.5840/tester1"
 )

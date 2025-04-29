@@ -3,7 +3,7 @@ package pan
 import (
 	// "fmt"
 
-	"6.5840/panapi"
+	"pan/panapi"
 	"6.5840/tester1"
 )
 
