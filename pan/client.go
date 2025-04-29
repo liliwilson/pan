@@ -20,12 +20,9 @@ type Reply struct{}
 
 // Create a new znode with flags; return the name of the new znode
 func (ck *Clerk) Create(path panapi.Ppath, data string, flags panapi.Flag) (panapi.Ppath, rpc.Err) {
-	// args := Args{}
-	// reply := Reply{}
-	// ok := true
-	// for ok {
-	// 	ok = ck.clnt.Call(ck.servers[0], "PanServer.Create", &args, &reply)
-	// }
+	args := Args{}
+	reply := Reply{}
+	ck.clnt.Call(ck.servers[0], "PanServer.Create", &args, &reply)
 	return path, rpc.OK
 }
 
