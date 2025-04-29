@@ -28,17 +28,17 @@ func (ck *Clerk) Create(path panapi.Ppath, data string, flags int) {
 
 func (ck *Clerk) Delete(path panapi.Ppath, version panapi.Pversion) {}
 
-func (ck *Clerk) Exists(path panapi.Ppath, watch chan int) bool {
+func (ck *Clerk) Exists(path panapi.Ppath, watch bool) bool {
 	return false
 }
 
-func (ck *Clerk) GetData(path panapi.Ppath, watch chan int) string {
+func (ck *Clerk) GetData(path panapi.Ppath, watch bool) string {
 	return ""
 }
 
 func (ck *Clerk) SetData(path panapi.Ppath, data string, version panapi.Pversion) {}
 
-func (ck *Clerk) GetChildren(path panapi.Ppath, watch chan int) []panapi.Ppath {
+func (ck *Clerk) GetChildren(path panapi.Ppath, watch bool) []panapi.Ppath {
 	return make([]panapi.Ppath, 0)
 }
 

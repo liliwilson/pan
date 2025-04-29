@@ -8,7 +8,18 @@ import (
 
 type IPNClerk interface {
 	Create(Ppath, string, int)
-	Exists(Ppath, chan int) bool
+	Delete(path Ppath, version Pversion)
+
+	// Watches block (for now........)
+	Exists(path Ppath, watch bool) bool
+
+	GetData(path Ppath, watch bool) string
+
+	SetData(path Ppath, data string, version Pversion)
+
+	GetChildren(path Ppath, watch bool) []Ppath
+
+	Sync(path Ppath)
 }
 
 type TestClerk struct {

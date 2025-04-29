@@ -16,7 +16,7 @@ func TestCheck(t *testing.T) {
 	for range 10 {
 		ck.Create("a/b", "hello", 0)
 	}
-	if !ck.Exists("a/b", make(chan int)) {
+	if !ck.Exists("a/b", false) {
 		ts.t.Fatalf("bruh")
 	}
 }
