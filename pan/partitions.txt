@@ -1,6 +1,16 @@
-1. All ops (except sync) with no failures; Create uses no flags
-2. Sequential Znodes with no failures
-3. Ephemeral Znodes with c
-4 and beyond. Figure out net failures
+Paritions are yes/no for all of the below:
+  - reliable net
+    - partitions (IF TIME)
+  - servers can crash
+  - clients can crash
+  - (for all operations in the spec) contains operation
+    - failure modes of operations (e.g. creating an already existent file)
+
+Following partitions are more specific
+  - One client, more than one client
+  - Five servers, not five servers (I think this is okay)
+  - Operations that can have watches having watches
+  - files are sequential or not
+  - files are ephemeral or not
 
 IF TIME: Check for linearizability
