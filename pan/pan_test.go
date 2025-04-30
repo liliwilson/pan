@@ -74,6 +74,10 @@ func TestManyClientSequential(t *testing.T) {
 	ts := MakeTest(t, "Many Client Sequential", nclients, 3, true, false, false, false, -1, false)
 	defer ts.Cleanup()
 	ck := ts.MakeClerk()
+	zname, err := ck.Create("/a/seq-", "data", panapi.Flag{Sequential: true})
+	if err != rpc.OK || zname != panapi.Ppath("/a/seq-0") {
+		ts.t.Fatalf("Initial sequential znode name was %s; expected /a/seq-0\n", zname)
+	}
 	cks := make([]panapi.IPNClerk, nclients)
 	chs := make([]chan int, nclients)
 	for i := range 3 {
@@ -91,9 +95,30 @@ func TestManyClientSequential(t *testing.T) {
 	c0 := <-chs[0]
 	c1 := <-chs[1]
 	c2 := <-chs[2]
-	total := c0 + c1 + c2
-	zname, err := ck.Create("/a/seq-", "data", panapi.Flag{Sequential: true})
+	total := c0 + c1 + c2 + 1
+	zname, err = ck.Create("/a/seq-", "data", panapi.Flag{Sequential: true})
 	if err != rpc.OK || zname != panapi.Ppath(fmt.Sprintf("/a/seq-%d", total)) {
 		ts.t.Fatalf("Created %s after %d previous sequential znode creations\n", zname, total)
+	}
+}
+
+// disconnect clerk and wait to see if ephemeral are gone
+func TestEphemeral(t *testing.T) {
+	ts := MakeTest(t, "Ephemeral znodes", 1, 3, true, false, true, false, -1, false)
+	defer ts.Cleanup()
+	path := panapi.Ppath("/a/testEpheral")
+	ck1 := ts.MakeClerk()
+	ck1.Create(path, "data", panapi.Flag{Ephemeral: true})
+	exists, _ := ck1.Exists(path, false)
+	if !exists {
+		ts.t.Fatal("Znode is missing after creation\n")
+	}
+	ck1.EndSession()
+	// Allow session end to propogate
+	time.Sleep(time.Second * 1)
+	ck := ts.MakeClerk()
+	exists, _ = ck.Exists(path, false)
+	if exists {
+		ts.t.Fatal("Ephemeral znode exists after creator disconnected\n")
 	}
 }
