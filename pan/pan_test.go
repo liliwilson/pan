@@ -2,14 +2,16 @@ package pan
 
 import (
 	"fmt"
-	"testing"
 	"reflect"
+	"testing"
+	"time"
 
 	// "6.5840/kvraft1/rsm"
 	// "6.5840/kvsrv1/rpc"
 	// "6.5840/panapi"
 	// tester "6.5840/tester1"
 	"pan/panapi"
+	"pan/panapi/rpc"
 )
 
 func compareGetData(file string, expectedData string, expectedVersion panapi.Pversion, actualData string, actualVersion panapi.Pversion) (bool, string) {
@@ -60,5 +62,38 @@ func TestBasic(t *testing.T) {
 	exists, _ = ck.Exists("/a/b", false)
 	if exists {
 		ts.t.Fatal("/a/b should not exist\n")
+	}
+}
+
+// Have concurrent clients create sequential nodes
+func TestManyClientSequential(t *testing.T) {
+	const (
+		nclients = 3
+		iters    = 100
+	)
+	ts := MakeTest(t, "Many Client Sequential", nclients, 3, true, false, false, false, -1, false)
+	defer ts.Cleanup()
+	ck := ts.MakeClerk()
+	cks := make([]panapi.IPNClerk, nclients)
+	chs := make([]chan int, nclients)
+	for i := range 3 {
+		cks[i] = ts.MakeClerk()
+		go func(idx int) {
+			start := time.Now()
+			count := 0
+			for time.Since(start) < time.Second {
+				cks[i].Create("/a/seq-", "data", panapi.Flag{Sequential: true})
+				count += 1
+			}
+			chs[i] <- count
+		}(i)
+	}
+	c0 := <-chs[0]
+	c1 := <-chs[1]
+	c2 := <-chs[2]
+	total := c0 + c1 + c2
+	zname, err := ck.Create("/a/seq-", "data", panapi.Flag{Sequential: true})
+	if err != rpc.OK || zname != panapi.Ppath(fmt.Sprintf("/a/seq-%d", total)) {
+		ts.t.Fatalf("Created %s after %d previous sequential znode creations\n", zname, total)
 	}
 }
