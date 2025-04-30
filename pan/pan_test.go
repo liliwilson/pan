@@ -122,3 +122,42 @@ func TestEphemeral(t *testing.T) {
 		ts.t.Fatal("Ephemeral znode exists after creator disconnected\n")
 	}
 }
+
+// create a lot of sequential and ephemeral nodes; disconnect;
+// reconnect and make sure next node is higher
+func TestSequentialMonotonicallyIncreases(t *testing.T) {
+	const (
+		nclients = 3
+		iters    = 100
+	)
+	ts := MakeTest(t, "Sequential Monotonically Increases", 1, 3, true, false, true, false, -1, false)
+	defer ts.Cleanup()
+	path := panapi.Ppath("/b/seq-")
+	ck := ts.MakeClerk()
+	cks := make([]panapi.IPNClerk, nclients)
+	chs := make([]chan int, nclients)
+	for i := range nclients {
+		cks[i] = ts.MakeClerk()
+		go func(idx int) {
+			start := time.Now()
+			count := 0
+			for time.Since(start) < time.Second {
+				cks[i].Create(path, "data", panapi.Flag{Sequential: true, Ephemeral: true})
+				count += 1
+			}
+			cks[i].EndSession()
+			chs[i] <- count
+		}(i)
+	}
+	c0 := <-chs[0]
+	c1 := <-chs[1]
+	c2 := <-chs[2]
+	children, err := ck.GetChildren("/b", false)
+	if err != rpc.OK || len(children) > 0 {
+		ts.t.Fatal("/b should have no children after nodes crashed\n")
+	}
+	fname, err := ck.Create(path, "data", panapi.Flag{Sequential: true, Ephemeral: true})
+	if err != rpc.OK || fname != panapi.Ppath(fmt.Sprintf("/b/seq-%d", c0+c1+c2)) {
+		ts.t.Fatalf("Created %s when %d previous ephermeral znodes were created", fname, c0+c1+c2)
+	}
+}
