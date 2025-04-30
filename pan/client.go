@@ -56,6 +56,8 @@ func (ck *Clerk) Sync(path panapi.Ppath) rpc.Err {
 	return rpc.OK
 }
 
+func (ck *Clerk) EndSession() {}
+
 func MakeClerk(clnt *tester.Clnt, servers []string) panapi.IPNClerk {
 	ck := &Clerk{clnt: clnt, servers: servers}
 	return ck
