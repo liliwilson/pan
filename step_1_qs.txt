@@ -1,0 +1,27 @@
+- should the version number start at 1 regardless of if we start with data in the node? (this is sorta trivial. i say we do it but just want to make sure we're aligned.)
+
+- what do we do if we try to Create a node that already exists? 
+    - i added new rpc, ErrOnCreate --> is this ok?
+
+- i added an error for trying to delete the root node, ErrDeleteRoot
+
+- i implemented create to be recursive, re: your question in problems.txt
+
+- i haven't implemented sequential or ephemeral znodes yet.
+    - for sequential, thinking of adding state to a znode like we talked abt (hashmap with sequence#). you cool w this?
+    - ephemeral will require a session ID, we can store data in the panserver. see below for my session thoughts.
+
+---
+
+other random thoughts i had:
+
+SESSIONS
+- have a StartSession rpc that the clerk calls to start a session. It will return a session ID.
+- when a clerk gets a session ID, kick off a goroutine sending keepalive RPCs to the server. these will just contain the session ID.
+    - from the go book, seems like they use a base timeout of 15 seconds before deeming a server dead. 
+- we should modify the spec so that every rpc also has a sessionID. that way we can track keepalives through requests as well, and set ephemeral znodes.
+- use new error type, ErrSessionClosed, to return if a stale sessionID is provided with an RPC.
+
+
+WATCHES
+- the more i think about it, the more i am into a "2 RPCs per RPC" strat. i.e. send one RPC to the server that does the function and returns quickly with a watch ID, and then have a second RPC (e.g. WaitForWatch(watchID)) that will block and do something when the watch returns. 

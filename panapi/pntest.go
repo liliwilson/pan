@@ -1,8 +1,8 @@
 package panapi
 
 import (
-	"testing"
 	"math/rand"
+	"testing"
 
 	"6.5840/tester1"
 	"pan/panapi/rpc"
@@ -19,28 +19,21 @@ func RandValue(n int) string {
 	return string(b)
 }
 
-type Pversion int
-type Ppath string
-type Flag struct {
-	Ephemeral  bool
-	Sequential bool
-}
-
 type IPNClerk interface {
-	Create(path Ppath, data string, flags Flag) (Ppath, rpc.Err)
+	Create(path rpc.Ppath, data string, flags rpc.Flag) (rpc.Ppath, rpc.Err)
 
-	Delete(path Ppath, version Pversion) rpc.Err
+	Delete(path rpc.Ppath, version rpc.Pversion) rpc.Err
 
 	// Watches block (for now........)
-	Exists(path Ppath, watch bool) (bool, rpc.Err)
+	Exists(path rpc.Ppath, watch bool) (bool, rpc.Err)
 
-	GetData(path Ppath, watch bool) (string, Pversion, rpc.Err)
+	GetData(path rpc.Ppath, watch bool) (string, rpc.Pversion, rpc.Err)
 
-	SetData(path Ppath, data string, version Pversion) rpc.Err
+	SetData(path rpc.Ppath, data string, version rpc.Pversion) rpc.Err
 
-	GetChildren(path Ppath, watch bool) ([]Ppath, rpc.Err)
+	GetChildren(path rpc.Ppath, watch bool) ([]rpc.Ppath, rpc.Err)
 
-	Sync(path Ppath) rpc.Err
+	Sync(path rpc.Ppath) rpc.Err
 }
 
 type TestClerk struct {
