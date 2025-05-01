@@ -34,6 +34,9 @@ type IPNClerk interface {
 	GetChildren(path rpc.Ppath, watch bool) ([]rpc.Ppath, rpc.Err)
 
 	Sync(path rpc.Ppath) rpc.Err
+
+	// Ends the current client session
+	EndSession()
 }
 
 type TestClerk struct {

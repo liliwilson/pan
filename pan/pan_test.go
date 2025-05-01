@@ -2,13 +2,17 @@ package pan
 
 import (
 	"fmt"
-	"pan/panapi/rpc"
 	"reflect"
 	"testing"
+	"time"
+
 	// "6.5840/kvraft1/rsm"
 	// "6.5840/kvsrv1/rpc"
 	// "6.5840/panapi"
 	// tester "6.5840/tester1"
+
+	"pan/panapi"
+	"pan/panapi/rpc"
 )
 
 func compareGetData(file string, expectedData string, expectedVersion rpc.Pversion, actualData string, actualVersion rpc.Pversion) (bool, string) {
@@ -76,5 +80,102 @@ func TestBasic(t *testing.T) {
 	exists, _ = ck.Exists("/a/b", false)
 	if exists {
 		ts.t.Fatal("/a/b should not exist\n")
+	}
+}
+
+// Have concurrent clients create sequential nodes
+func TestManyClientSequential(t *testing.T) {
+	const (
+		nclients = 3
+		iters    = 100
+	)
+	ts := MakeTest(t, "Many Client Sequential", nclients, 3, true, false, false, false, -1, false)
+	defer ts.Cleanup()
+	ck := ts.MakeClerk()
+	zname, err := ck.Create("/a/seq-", "data", panapi.Flag{Sequential: true})
+	if err != rpc.OK || zname != panapi.Ppath("/a/seq-0") {
+		ts.t.Fatalf("Initial sequential znode name was %s; expected /a/seq-0\n", zname)
+	}
+	cks := make([]panapi.IPNClerk, nclients)
+	chs := make([]chan int, nclients)
+	for i := range 3 {
+		cks[i] = ts.MakeClerk()
+		go func(idx int) {
+			start := time.Now()
+			count := 0
+			for time.Since(start) < time.Second {
+				cks[i].Create("/a/seq-", "data", panapi.Flag{Sequential: true})
+				count += 1
+			}
+			chs[i] <- count
+		}(i)
+	}
+	c0 := <-chs[0]
+	c1 := <-chs[1]
+	c2 := <-chs[2]
+	total := c0 + c1 + c2 + 1
+	zname, err = ck.Create("/a/seq-", "data", panapi.Flag{Sequential: true})
+	if err != rpc.OK || zname != panapi.Ppath(fmt.Sprintf("/a/seq-%d", total)) {
+		ts.t.Fatalf("Created %s after %d previous sequential znode creations\n", zname, total)
+	}
+}
+
+// disconnect clerk and wait to see if ephemeral are gone
+func TestEphemeral(t *testing.T) {
+	ts := MakeTest(t, "Ephemeral znodes", 1, 3, true, false, true, false, -1, false)
+	defer ts.Cleanup()
+	path := panapi.Ppath("/a/testEpheral")
+	ck1 := ts.MakeClerk()
+	ck1.Create(path, "data", panapi.Flag{Ephemeral: true})
+	exists, _ := ck1.Exists(path, false)
+	if !exists {
+		ts.t.Fatal("Znode is missing after creation\n")
+	}
+	ck1.EndSession()
+	// Allow session end to propogate
+	time.Sleep(time.Second * 1)
+	ck := ts.MakeClerk()
+	exists, _ = ck.Exists(path, false)
+	if exists {
+		ts.t.Fatal("Ephemeral znode exists after creator disconnected\n")
+	}
+}
+
+// create a lot of sequential and ephemeral nodes; disconnect;
+// reconnect and make sure next node is higher
+func TestSequentialMonotonicallyIncreases(t *testing.T) {
+	const (
+		nclients = 3
+		iters    = 100
+	)
+	ts := MakeTest(t, "Sequential Monotonically Increases", 1, 3, true, false, true, false, -1, false)
+	defer ts.Cleanup()
+	path := panapi.Ppath("/b/seq-")
+	ck := ts.MakeClerk()
+	cks := make([]panapi.IPNClerk, nclients)
+	chs := make([]chan int, nclients)
+	for i := range nclients {
+		cks[i] = ts.MakeClerk()
+		go func(idx int) {
+			start := time.Now()
+			count := 0
+			for time.Since(start) < time.Second {
+				cks[i].Create(path, "data", panapi.Flag{Sequential: true, Ephemeral: true})
+				count += 1
+			}
+			cks[i].EndSession()
+			chs[i] <- count
+		}(i)
+	}
+	c0 := <-chs[0]
+	c1 := <-chs[1]
+	c2 := <-chs[2]
+	children, err := ck.GetChildren("/b", false)
+	if err != rpc.OK || len(children) > 0 {
+		ts.t.Fatal("/b should have no children after nodes crashed\n")
+	}
+	fname, err := ck.Create(path, "data", panapi.Flag{Sequential: true, Ephemeral: true})
+	if err != rpc.OK || fname != panapi.Ppath(fmt.Sprintf("/b/seq-%d", c0+c1+c2)) {
+		ts.t.Fatalf("Created %s when %d previous ephermeral znodes were created", fname, c0+c1+c2)
 	}
 }
