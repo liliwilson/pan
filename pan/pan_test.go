@@ -32,7 +32,7 @@ func compareGetChildren(dir string, expectedChildren []rpc.Ppath, actualChildren
 func TestBasic(t *testing.T) {
 	ts := MakeTest(t, "Synchronous One-client Basic", 1, 3, true, false, false, false, -1, false)
 	defer ts.Cleanup()
-	ck := ts.MakeClerk()
+	ck := ts.MakeSession()
 	// Test Create and Exists
 	ck.Create("/a", "", rpc.Flag{})
 	ck.Create("/a/b", "hello", rpc.Flag{})
@@ -91,16 +91,16 @@ func TestManyClientSequential(t *testing.T) {
 	)
 	ts := MakeTest(t, "Many Client Sequential", nclients, 3, true, false, false, false, -1, false)
 	defer ts.Cleanup()
-	ck := ts.MakeClerk()
+	ck := ts.MakeSession()
 	zname, err := ck.Create("/a/seq-", "data", rpc.Flag{Sequential: true})
 	if err != rpc.OK || zname != rpc.Ppath("/a/seq-0") {
 		ts.t.Fatalf("Initial sequential znode name was %s; expected /a/seq-0\n", zname)
 	}
-	cks := make([]panapi.IPNClerk, nclients)
+	cks := make([]panapi.IPNSession, nclients)
 	chs := make([]chan int, nclients)
 	for i := range 3 {
 		chs[i] = make(chan int)
-		cks[i] = ts.MakeClerk()
+		cks[i] = ts.MakeSession()
 		go func(idx int) {
 			start := time.Now()
 			count := 0
@@ -126,7 +126,7 @@ func TestEphemeral(t *testing.T) {
 	ts := MakeTest(t, "Ephemeral znodes", 1, 3, true, false, true, false, -1, false)
 	defer ts.Cleanup()
 	path := rpc.Ppath("/a/testEpheral")
-	ck1 := ts.MakeClerk()
+	ck1 := ts.MakeSession()
 	ck1.Create(path, "data", rpc.Flag{Ephemeral: true})
 	exists, _ := ck1.Exists(path, false)
 	if !exists {
@@ -135,7 +135,7 @@ func TestEphemeral(t *testing.T) {
 	ck1.EndSession()
 	// Allow session end to propogate
 	time.Sleep(time.Second * 1)
-	ck := ts.MakeClerk()
+	ck := ts.MakeSession()
 	exists, _ = ck.Exists(path, false)
 	if exists {
 		ts.t.Fatal("Ephemeral znode exists after creator disconnected\n")
@@ -152,12 +152,12 @@ func TestSequentialMonotonicallyIncreases(t *testing.T) {
 	ts := MakeTest(t, "Sequential Monotonically Increases", 1, 3, true, false, true, false, -1, false)
 	defer ts.Cleanup()
 	path := rpc.Ppath("/b/seq-")
-	ck := ts.MakeClerk()
-	cks := make([]panapi.IPNClerk, nclients)
+	ck := ts.MakeSession()
+	cks := make([]panapi.IPNSession, nclients)
 	chs := make([]chan int, nclients)
 	for i := range nclients {
 		chs[i] = make(chan int)
-		cks[i] = ts.MakeClerk()
+		cks[i] = ts.MakeSession()
 		go func(idx int) {
 			start := time.Now()
 			count := 0

@@ -45,21 +45,21 @@ func (ts *Test) StartPanServer(servers []*labrpc.ClientEnd, gid tester.Tgid, me 
 	return StartPanServer(servers, gid, me, persister, ts.maxraftstate)
 }
 
-func (ts *Test) MakeClerk() panapi.IPNClerk {
+func (ts *Test) MakeSession() panapi.IPNSession {
 	clnt := ts.Config.MakeClient()
-	ck := MakeClerk(clnt, ts.Group(Gid).SrvNames())
-	return &panapi.TestClerk{ck, clnt}
+	ck := MakeSession(clnt, ts.Group(Gid).SrvNames())
+	return &panapi.TestSession{ck, clnt}
 }
 
-func (ts *Test) MakeClerkTo(to []int) panapi.IPNClerk {
+func (ts *Test) MakeSessionTo(to []int) panapi.IPNSession {
 	ns := ts.Config.Group(Gid).SrvNamesTo(to)
 	clnt := ts.Config.MakeClientTo(ns)
-	ck := MakeClerk(clnt, ts.Group(Gid).SrvNames())
-	return &panapi.TestClerk{ck, clnt}
+	ck := MakeSession(clnt, ts.Group(Gid).SrvNames())
+	return &panapi.TestSession{ck, clnt}
 }
 
-func (ts *Test) DeleteClerk(ck panapi.IPNClerk) {
-	tck := ck.(*panapi.TestClerk)
+func (ts *Test) DeleteSession(ck panapi.IPNSession) {
+	tck := ck.(*panapi.TestSession)
 	ts.DeleteClient(tck.Clnt)
 }
 
