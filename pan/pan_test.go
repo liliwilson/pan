@@ -99,6 +99,7 @@ func TestManyClientSequential(t *testing.T) {
 	cks := make([]panapi.IPNClerk, nclients)
 	chs := make([]chan int, nclients)
 	for i := range 3 {
+		chs[i] = make(chan int)
 		cks[i] = ts.MakeClerk()
 		go func(idx int) {
 			start := time.Now()
@@ -155,6 +156,7 @@ func TestSequentialMonotonicallyIncreases(t *testing.T) {
 	cks := make([]panapi.IPNClerk, nclients)
 	chs := make([]chan int, nclients)
 	for i := range nclients {
+		chs[i] = make(chan int)
 		cks[i] = ts.MakeClerk()
 		go func(idx int) {
 			start := time.Now()
