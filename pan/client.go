@@ -40,7 +40,7 @@ func (ck *Session) Delete(path rpc.Ppath, version rpc.Pversion) rpc.Err {
 }
 
 // Returns true iff the znode at path exists
-func (ck *Session) Exists(path rpc.Ppath, watch bool) (bool, rpc.Err) {
+func (ck *Session) Exists(path rpc.Ppath, watch rpc.Watch) (bool, rpc.Err) {
 	args := rpc.ExistsArgs{SessionId: ck.id, Path: path, Watch: watch}
 	reply := rpc.ExistsReply{}
 	ck.clnt.Call(ck.servers[0], "PanServer.Exists", &args, &reply)
@@ -48,7 +48,7 @@ func (ck *Session) Exists(path rpc.Ppath, watch bool) (bool, rpc.Err) {
 }
 
 // Returns the data and version information about znode
-func (ck *Session) GetData(path rpc.Ppath, watch bool) (string, rpc.Pversion, rpc.Err) {
+func (ck *Session) GetData(path rpc.Ppath, watch rpc.Watch) (string, rpc.Pversion, rpc.Err) {
 	args := rpc.GetDataArgs{SessionId: ck.id, Path: path, Watch: watch}
 	reply := rpc.GetDataReply{}
 	ck.clnt.Call(ck.servers[0], "PanServer.GetData", &args, &reply)
@@ -64,7 +64,7 @@ func (ck *Session) SetData(path rpc.Ppath, data string, version rpc.Pversion) rp
 }
 
 // Returns an alphabetically sorted list of child znodes
-func (ck *Session) GetChildren(path rpc.Ppath, watch bool) ([]rpc.Ppath, rpc.Err) {
+func (ck *Session) GetChildren(path rpc.Ppath, watch rpc.Watch) ([]rpc.Ppath, rpc.Err) {
 	args := rpc.GetChildrenArgs{SessionId: ck.id, Path: path, Watch: watch}
 	reply := rpc.GetChildrenReply{}
 	ck.clnt.Call(ck.servers[0], "PanServer.GetChildren", &args, &reply)

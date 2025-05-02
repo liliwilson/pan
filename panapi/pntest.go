@@ -29,13 +29,13 @@ type IPNSession interface {
 	Delete(path rpc.Ppath, version rpc.Pversion) rpc.Err
 
 	// Watches block (for now........)
-	Exists(path rpc.Ppath, watch bool) (bool, rpc.Err)
+	Exists(path rpc.Ppath, watch rpc.Watch) (bool, rpc.Err)
 
-	GetData(path rpc.Ppath, watch bool) (string, rpc.Pversion, rpc.Err)
+	GetData(path rpc.Ppath, watch rpc.Watch) (string, rpc.Pversion, rpc.Err)
 
 	SetData(path rpc.Ppath, data string, version rpc.Pversion) rpc.Err
 
-	GetChildren(path rpc.Ppath, watch bool) ([]rpc.Ppath, rpc.Err)
+	GetChildren(path rpc.Ppath, watch rpc.Watch) ([]rpc.Ppath, rpc.Err)
 
 	Sync(path rpc.Ppath) rpc.Err
 
@@ -126,18 +126,18 @@ type TestType struct {
 	Expected  int
 }
 
-func (ts *Test) CheckRes(ck IPNSession, res TestType, file rpc.Ppath) {
-	children, _ := ck.GetChildren(file, false)
+func (ts *Test) CheckRes(ck IPNSession, res TestType, dir rpc.Ppath) {
+	children, _ := ck.GetChildren(dir, rpc.Watch{ShouldWatch: false, Callback: func(){}})
 	if len(children) != len(res.Remaining) {
 		ts.t.Fatalf("Number of children: %d, number of remaining ephemeral znodes: %d\n", len(children), len(res.Remaining))
 	}
 	for _, path := range children {
-		if _, ok := res.Remaining[file + "/" + path]; !ok {
+		if _, ok := res.Remaining[dir + "/" + path]; !ok {
 			ts.t.Fatalf("%s is a child but should have been deleted by client crash\n", path)
 		}
 	}
-	actual, _ := ck.Create(file + "/f-", "", rpc.Flag{Ephemeral: false, Sequential: true})
-	expected := file + "/f-" + rpc.Ppath(strconv.Itoa(res.Expected))
+	actual, _ := ck.Create(dir + "/f-", "", rpc.Flag{Ephemeral: false, Sequential: true})
+	expected := dir + "/f-" + rpc.Ppath(strconv.Itoa(res.Expected))
 	if actual != expected {
 		ts.t.Fatalf("Created znode %s but expected znode %s instead\n", actual, expected)
 	}

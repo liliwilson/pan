@@ -37,47 +37,47 @@ func TestBasic(t *testing.T) {
 	ck.Create("/a", "", rpc.Flag{})
 	ck.Create("/a/b", "hello", rpc.Flag{})
 
-	exists, _ := ck.Exists("/a", false)
+	exists, _ := ck.Exists("/a", rpc.Watch{ShouldWatch: false, Callback: func() {}})
 	if !exists {
 		ts.t.Fatalf("/a should exist\n")
 	}
 
-	exists, _ = ck.Exists("/a/b", false)
+	exists, _ = ck.Exists("/a/b", rpc.Watch{ShouldWatch:false, Callback: func() {}})
 	if !exists {
 		ts.t.Fatalf("/a/b should exist\n")
 	}
 
-	exists, _ = ck.Exists("/a/b/c", false)
+	exists, _ = ck.Exists("/a/b/c", rpc.Watch{ShouldWatch: false, Callback: func() {}})
 	if exists {
 		ts.t.Fatalf("/a/b/c should not exist\n")
 	}
 
-	exists, _ = ck.Exists("/a/c", false)
+	exists, _ = ck.Exists("/a/c", rpc.Watch{ShouldWatch: false, Callback: func() {}})
 	if exists {
 		ts.t.Fatalf("/a/c should not exist\n")
 	}
 
 	// Test GetData
-	data, version, _ := ck.GetData("/a/b", false)
+	data, version, _ := ck.GetData("/a/b", rpc.Watch{ShouldWatch: false, Callback: func() {}})
 	if ok, err := compareGetData("/a/b", "hello", 1, data, version); !ok {
 		ts.t.Fatal(err)
 	}
 	// TestSetData
 	ck.SetData("/a/b", "bye", 1)
-	data, version, _ = ck.GetData("/a/b", false)
+	data, version, _ = ck.GetData("/a/b", rpc.Watch{ShouldWatch: false, Callback: func() {}})
 	if ok, err := compareGetData("/a/b", "bye", 2, data, version); !ok {
 		ts.t.Fatal(err)
 	}
 	// Test Get Children
 	ck.Create("/a/c", "1", rpc.Flag{})
 	ck.Create("/a/d", "2", rpc.Flag{})
-	children, _ := ck.GetChildren("/a", false)
+	children, _ := ck.GetChildren("/a", rpc.Watch{ShouldWatch: false, Callback: func() {}})
 	if ok, err := compareGetChildren("/a", []rpc.Ppath{"b", "c", "d"}, children); !ok {
 		ts.t.Fatal(err)
 	}
 	// Test Delete and Exists
 	ck.Delete("/a/b", 2)
-	exists, _ = ck.Exists("/a/b", false)
+	exists, _ = ck.Exists("/a/b", rpc.Watch{ShouldWatch: false, Callback: func() {}})
 	if exists {
 		ts.t.Fatal("/a/b should not exist\n")
 	}
@@ -128,7 +128,7 @@ func TestEphemeral(t *testing.T) {
 	path := rpc.Ppath("/a/testEpheral")
 	ck1 := ts.MakeSession()
 	ck1.Create(path, "data", rpc.Flag{Ephemeral: true})
-	exists, _ := ck1.Exists(path, false)
+	exists, _ := ck1.Exists(path, rpc.Watch{ShouldWatch: false, Callback: func() {}})
 	if !exists {
 		ts.t.Fatal("Znode is missing after creation\n")
 	}
@@ -136,7 +136,7 @@ func TestEphemeral(t *testing.T) {
 	// Allow session end to propogate
 	time.Sleep(time.Second * 1)
 	ck := ts.MakeSession()
-	exists, _ = ck.Exists(path, false)
+	exists, _ = ck.Exists(path, rpc.Watch{ShouldWatch: false, Callback: func() {}})
 	if exists {
 		ts.t.Fatal("Ephemeral znode exists after creator disconnected\n")
 	}
@@ -172,7 +172,7 @@ func TestSequentialMonotonicallyIncreases(t *testing.T) {
 	c0 := <-chs[0]
 	c1 := <-chs[1]
 	c2 := <-chs[2]
-	children, err := ck.GetChildren("/b", false)
+	children, err := ck.GetChildren("/b", rpc.Watch{ShouldWatch: false, Callback: func() {}})
 	if err != rpc.OK || len(children) > 0 {
 		ts.t.Fatal("/b should have no children after nodes crashed\n")
 	}

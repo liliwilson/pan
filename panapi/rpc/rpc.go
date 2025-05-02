@@ -13,6 +13,11 @@ func (path *Ppath) ParsePath() []string {
 	return strings.Split(string(*path), "/")
 }
 
+type Watch struct {
+	ShouldWatch bool
+	Callback    func()
+}
+
 type Err string
 
 const (
@@ -54,7 +59,7 @@ type CreateReply struct {
 type ExistsArgs struct {
 	SessionId string
 	Path      Ppath
-	Watch     bool
+	Watch     Watch
 }
 
 type ExistsReply struct {
@@ -65,7 +70,7 @@ type ExistsReply struct {
 type GetDataArgs struct {
 	SessionId string
 	Path      Ppath
-	Watch     bool
+	Watch     Watch
 }
 
 type GetDataReply struct {
@@ -88,7 +93,7 @@ type SetDataReply struct {
 type GetChildrenArgs struct {
 	SessionId string
 	Path      Ppath
-	Watch     bool
+	Watch     Watch
 }
 
 type GetChildrenReply struct {
