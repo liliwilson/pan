@@ -132,12 +132,12 @@ func (ts *Test) CheckRes(ck IPNSession, res TestType, file rpc.Ppath) {
 		ts.t.Fatalf("Number of children: %d, number of remaining ephemeral znodes: %d\n", len(children), len(res.Remaining))
 	}
 	for _, path := range children {
-		if _, ok := res.Remaining[path]; !ok {
+		if _, ok := res.Remaining[file + "/" + path]; !ok {
 			ts.t.Fatalf("%s is a child but should have been deleted by client crash\n", path)
 		}
 	}
-	actual, _ := ck.Create(file, "", rpc.Flag{Ephemeral: false, Sequential: true})
-	expected := file + rpc.Ppath(strconv.Itoa(res.Expected))
+	actual, _ := ck.Create(file + "/f-", "", rpc.Flag{Ephemeral: false, Sequential: true})
+	expected := file + "/f-" + rpc.Ppath(strconv.Itoa(res.Expected))
 	if actual != expected {
 		ts.t.Fatalf("Created znode %s but expected znode %s instead\n", actual, expected)
 	}
@@ -160,7 +160,7 @@ func (ts *Test) StartSessionsAndWait(nclnt int, t time.Duration, file rpc.Ppath,
 					fname, _ := session.Create(file, "", rpc.Flag{Sequential: true, Ephemeral: true})
 					iter_paths = append(iter_paths, fname)
 				}
-				if clientCrashes && (rand.Int() % 100) < 30 {
+				if clientCrashes && (rand.Int()%100) < 30 {
 					ts.Crash(session)
 				} else {
 					paths = append(paths, iter_paths...)

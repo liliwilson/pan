@@ -198,6 +198,7 @@ func (ts *Test) GenericTest() {
 	ck := ts.MakeSession()
 	for i := 0; i < NITER; i++ {
 		file := rpc.Ppath(fmt.Sprintf("/a/b%d/f-", i))
+		parent := rpc.Ppath(fmt.Sprintf("/a/b%d", i))
 		go func() {
 			tt := ts.StartSessionsAndWait(ts.nclients, T, file, ts.clientCrash, ch_err)
 			ch_spawn <- tt
@@ -241,7 +242,7 @@ func (ts *Test) GenericTest() {
 		}
 
 		// at this point, all network should be good
-		ts.CheckRes(ck, res, file)
+		ts.CheckRes(ck, res, parent)
 	}
 }
 
