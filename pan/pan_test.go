@@ -9,7 +9,7 @@ import (
 	// "6.5840/kvraft1/rsm"
 	// "6.5840/kvsrv1/rpc"
 	// "6.5840/rpc.
-	// tester "6.5840/tester1"
+	tester "6.5840/tester1"
 
 	"pan/panapi"
 	"pan/panapi/rpc"
@@ -194,16 +194,17 @@ func (ts *Test) GenericTest() {
 	ch_partitioner := make(chan bool)
 	ch_spawn := make(chan panapi.TestType)
 	ch_crash := make(chan struct{})
+	ch_err := make(chan string)
 	ck := ts.MakeClerk()
 	for i := 0; i < NITER; i++ {
 		file := rpc.Ppath(fmt.Sprintf("/a/b%d/f-", i))
 		go func() {
-			tt := ts.StartSessionsAndWait(ts.nclients, T, file)
+			tt := ts.StartSessionsAndWait(ts.nclients, T, file, ts.clientCrash, ch_err)
 			ch_spawn <- tt
 		}()
 
 		// Let clients perform ops without interruption
-		time.Sleep(T)
+		time.Sleep(500 * time.Millisecond)
 
 		if ts.leaderCrash {
 			go func() {
@@ -221,8 +222,15 @@ func (ts *Test) GenericTest() {
 			go ts.Partitioner(Gid, ch_partitioner)
 		}
 
-		<-ch_crash // waits for leaders to stop crashing
-		res := <-ch_spawn
+		if ts.leaderCrash {
+			<-ch_crash // waits for leaders to stop crashing
+		}
+		var res panapi.TestType
+		select {
+		case res = <-ch_spawn:
+		case err_msg := <-ch_err:
+			ts.t.Fatal(err_msg)
+		}
 
 		if ts.partitions {
 			// this if block ends the partitioning
@@ -235,4 +243,52 @@ func (ts *Test) GenericTest() {
 		// at this point, all network should be good
 		ts.CheckRes(ck, res, file)
 	}
+}
+
+func TestNoErrors(t *testing.T) {
+	ts := MakeTest(t, "No Unreliability", 3, 5, true, false, false, false, -1, false)
+	tester.AnnotateTest("TestNoErrors", 5)
+	ts.GenericTest()
+}
+
+func TestClientCrashes(t *testing.T) {
+	ts := MakeTest(t, "Test Client Crashes", 3, 5, true, false, true, false, -1, false)
+	tester.AnnotateTest("TestClientCrashes", 5)
+	ts.GenericTest()
+}
+
+func TestLeaderCrashes(t *testing.T) {
+	ts := MakeTest(t, "Test Leader Crashes", 3, 5, true, true, false, false, -1, false)
+	tester.AnnotateTest("TestLeaderCrashes", 5)
+	ts.GenericTest()
+}
+
+func TestPartitions(t *testing.T) {
+	ts := MakeTest(t, "Test Partitions", 3, 5, true, false, false, true, -1, false)
+	tester.AnnotateTest("TestPartitions", 5)
+	ts.GenericTest()
+}
+
+func TestClientCrashesLeaderCrashes(t *testing.T) {
+	ts := MakeTest(t, "Test Client and Leader Crashes", 3, 5, true, true, true, false, -1, false)
+	tester.AnnotateTest("TestClientCrashesLeaderCrashes", 5)
+	ts.GenericTest()
+}
+
+func TestClientCrashesWithPartitions(t *testing.T) {
+	ts := MakeTest(t, "Test Client Crashes and Partitions", 3, 5, true, false, true, true, -1, false)
+	tester.AnnotateTest("TestClientCrashesWithPartitions", 5)
+	ts.GenericTest()
+}
+
+func TestLeaderCrashesWithPartitions(t *testing.T) {
+	ts := MakeTest(t, "Test Leader Crashes and Partitions", 3, 5, true, true, false, true, -1, false)
+	tester.AnnotateTest("TestLeaderCrashesWithPartitions", 5)
+	ts.GenericTest()
+}
+
+func TestClientCrashesLeaderCrashesWithPartitions(t *testing.T) {
+	ts := MakeTest(t, "Test Client Crashes and Leader Crashes and Partitions", 3, 5, true, true, true, true, -1, false)
+	tester.AnnotateTest("TestClientCrashesLeaderCrashesWithPartitions", 5)
+	ts.GenericTest()
 }

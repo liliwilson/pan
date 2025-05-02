@@ -1,6 +1,7 @@
 package panapi
 
 import (
+	"fmt"
 	"math/rand"
 	"strconv"
 	"testing"
@@ -61,9 +62,9 @@ type Test struct {
 
 func MakeTest(t *testing.T, cfg *tester.Config, randomfiles bool, mck IClerkMaker) *Test {
 	ts := &Test{
-		Config: cfg,
-		t: t,
-		mck: mck,
+		Config:      cfg,
+		t:           t,
+		mck:         mck,
 		randomfiles: randomfiles,
 	}
 	return ts
@@ -115,13 +116,13 @@ func (ts *Test) Partitioner(gid tester.Tgid, ch chan bool) {
 			}
 			ts.Group(gid).Partition(pa[0], pa[1])
 			tester.AnnotateTwoPartitions(pa[0], pa[1])
-			time.Sleep(1 * time.Second + time.Duration(rand.Int63()%200)*time.Millisecond)
+			time.Sleep(1*time.Second + time.Duration(rand.Int63()%200)*time.Millisecond)
 		}
 	}
 }
 
 type TestType struct {
-	Remaining map[rpc.Ppath]int
+	Remaining map[rpc.Ppath]bool
 	Expected  int
 }
 
@@ -142,6 +143,49 @@ func (ts *Test) CheckRes(ck IPNClerk, res TestType, file rpc.Ppath) {
 	}
 }
 
-func (ts *Test) StartSessionsAndWait(nclnt int, t time.Duration, file rpc.Ppath) TestType {
-	return TestType{}
+func (ts *Test) StartSessionsAndWait(nclnt int, t time.Duration, file rpc.Ppath, clientCrashes bool, ch_err chan string) TestType {
+	const (
+		PERITER = 10
+		ITERS   = 5
+	)
+	ch_path := make([]chan []rpc.Ppath, nclnt)
+	for i := range nclnt {
+		ch_path[i] = make(chan []rpc.Ppath)
+		go func() {
+			session := ts.MakeClerk()
+			paths := make([]rpc.Ppath, 0)
+			for range ITERS {
+				iter_paths := make([]rpc.Ppath, 0)
+				for range PERITER {
+					fname, _ := session.Create(file, "", rpc.Flag{Sequential: true, Ephemeral: true})
+					iter_paths = append(iter_paths, fname)
+				}
+				if clientCrashes && (rand.Int() % 100) < 30 {
+					ts.Crash(session)
+				} else {
+					paths = append(paths, iter_paths...)
+				}
+				session = ts.MakeClerk()
+			}
+			ch_path[i] <- paths
+		}()
+	}
+	remaining := make(map[rpc.Ppath]bool)
+	for i := range nclnt {
+		paths := <-ch_path[i]
+		for _, path := range paths {
+			if _, ok := remaining[path]; ok {
+				err := fmt.Sprintf("Path %s created by two clients", path)
+				ch_err <- err
+				ts.t.FailNow()
+			}
+			remaining[path] = true
+		}
+	}
+	return TestType{Remaining: remaining, Expected: PERITER * ITERS * nclnt}
+}
+
+func (ts *Test) Crash(session IPNClerk) {
+	testSession := session.(*TestClerk)
+	testSession.Clnt.DisconnectAll()
 }
