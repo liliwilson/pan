@@ -204,7 +204,7 @@ func (ts *Test) GenericTest() {
 		}()
 
 		// Let clients perform ops without interruption
-		time.Sleep(500 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 
 		if ts.leaderCrash {
 			go func() {
