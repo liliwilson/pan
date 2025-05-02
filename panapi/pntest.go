@@ -2,10 +2,13 @@ package panapi
 
 import (
 	"math/rand"
+	"strconv"
 	"testing"
+	"time"
+
+	"pan/panapi/rpc"
 
 	"6.5840/tester1"
-	"pan/panapi/rpc"
 )
 
 // n specifies the length of the string to be generated.
@@ -79,4 +82,66 @@ func (ts *Test) ConnectClnts(clnts []*tester.Clnt) {
 
 func (ts *Test) MakeClerk() IPNClerk {
 	return ts.mck.MakeClerk()
+}
+
+func MakeFiles(n int) []rpc.Ppath {
+	files := make([]rpc.Ppath, n)
+	for i := 0; i < n; i++ {
+		files[i] = rpc.Ppath("/a/f" + strconv.Itoa(i))
+	}
+	return files
+}
+
+// repartition the servers periodically
+func (ts *Test) Partitioner(gid tester.Tgid, ch chan bool) {
+	defer func() { ch <- true }()
+	for true {
+		select {
+		case <-ch:
+			return
+		default:
+			a := make([]int, ts.Group(gid).N())
+			for i := 0; i < ts.Group(gid).N(); i++ {
+				a[i] = (rand.Int() % 2)
+			}
+			pa := make([][]int, 2)
+			for i := 0; i < 2; i++ {
+				pa[i] = make([]int, 0)
+				for j := 0; j < ts.Group(gid).N(); j++ {
+					if a[j] == i {
+						pa[i] = append(pa[i], j)
+					}
+				}
+			}
+			ts.Group(gid).Partition(pa[0], pa[1])
+			tester.AnnotateTwoPartitions(pa[0], pa[1])
+			time.Sleep(1 * time.Second + time.Duration(rand.Int63()%200)*time.Millisecond)
+		}
+	}
+}
+
+type TestType struct {
+	Remaining map[rpc.Ppath]int
+	Expected  int
+}
+
+func (ts *Test) CheckRes(ck IPNClerk, res TestType, file rpc.Ppath) {
+	children, _ := ck.GetChildren(file, false)
+	if len(children) != len(res.Remaining) {
+		ts.t.Fatalf("Number of children: %d, number of remaining ephemeral znodes: %d\n", len(children), len(res.Remaining))
+	}
+	for _, path := range children {
+		if _, ok := res.Remaining[path]; !ok {
+			ts.t.Fatalf("%s is a child but should have been deleted by client crash\n", path)
+		}
+	}
+	actual, _ := ck.Create(file, "", rpc.Flag{Ephemeral: false, Sequential: true})
+	expected := file + rpc.Ppath(strconv.Itoa(res.Expected))
+	if actual != expected {
+		ts.t.Fatalf("Created znode %s but expected znode %s instead\n", actual, expected)
+	}
+}
+
+func (ts *Test) StartSessionsAndWait(nclnt int, t time.Duration, file rpc.Ppath) TestType {
+	return TestType{}
 }

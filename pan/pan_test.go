@@ -179,3 +179,58 @@ func TestSequentialMonotonicallyIncreases(t *testing.T) {
 		ts.t.Fatalf("Created %s when %d previous ephermeral znodes were created", fname, c0+c1+c2)
 	}
 }
+
+func (ts *Test) GenericTest() {
+	const (
+		NITER  = 3
+		NSEC   = 1
+		T      = NSEC * time.Second
+		NFILES = 100
+	)
+	defer ts.Cleanup()
+
+	ch_partitioner := make(chan bool)
+	ch_spawn := make(chan panapi.TestType)
+	ch_crash := make(chan struct{})
+	ck := ts.MakeClerk()
+	for i := 0; i < NITER; i++ {
+		file := rpc.Ppath(fmt.Sprintf("/a/b%d/f-", i))
+		go func() {
+			tt := ts.StartSessionsAndWait(ts.nclients, T, file)
+			ch_spawn <- tt
+		}()
+
+		// Let clients perform ops without interruption
+		time.Sleep(T)
+
+		if ts.leaderCrash {
+			go func() {
+				for i := 0; i < ts.nservers; i++ {
+					ts.Group(Gid).ShutdownServer(i)
+					time.Sleep(T)
+					ts.Group(Gid).StartServer(i)
+				}
+				ts.Group(Gid).ConnectAll()
+				ch_crash <- struct{}{}
+			}()
+		}
+
+		if ts.partitions {
+			go ts.Partitioner(Gid, ch_partitioner)
+		}
+
+		<-ch_crash // waits for leaders to stop crashing
+		res := <-ch_spawn
+
+		if ts.partitions {
+			// this if block ends the partitioning
+			ch_partitioner <- true
+			<-ch_partitioner
+			ts.Group(Gid).ConnectAll()
+			time.Sleep(T)
+		}
+
+		// at this point, all network should be good
+		ts.CheckRes(ck, res, file)
+	}
+}

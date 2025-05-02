@@ -14,7 +14,7 @@ type Test struct {
 	part         string // to print which test it is
 	nclients     int
 	nservers     int
-	serverCrash  bool
+	leaderCrash  bool
 	clientCrash  bool
 	partitions   bool
 	maxraftstate int // probably unecessary?
@@ -23,13 +23,13 @@ type Test struct {
 
 const Gid = tester.GRP0
 
-func MakeTest(t *testing.T, part string, nclients int, nservers int, reliable bool, serverCrash bool, clientCrash bool, partitions bool, maxraftstate int, randomfiles bool) *Test {
+func MakeTest(t *testing.T, part string, nclients int, nservers int, reliable bool, leaderCrash bool, clientCrash bool, partitions bool, maxraftstate int, randomfiles bool) *Test {
 	ts := &Test{
 		t:            t,
 		part:         part,
 		nclients:     nclients,
 		nservers:     nservers,
-		serverCrash:  serverCrash,
+		leaderCrash:  leaderCrash,
 		clientCrash:  clientCrash,
 		partitions:   partitions,
 		maxraftstate: maxraftstate,
@@ -69,9 +69,9 @@ func (ts *Test) cleanup() {
 
 func (ts *Test) makeTitle() string {
 	title := "Test: "
-	if ts.serverCrash {
+	if ts.leaderCrash {
 		// peers re-start, and thus persistence must work.
-		title = title + "server restarts, "
+		title = title + "leader crashes, "
 	}
 	if ts.clientCrash {
 		title = title + "client restarts, "
