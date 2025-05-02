@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"pan/panapi/rpc"
 	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -18,19 +20,29 @@ type ZNode struct {
 	data     string
 	version  rpc.Pversion
 	children []*ZNode
+
+	sequenceNums map[string]int
 }
 
 // Insert a node into a child's znode list at the correct spot.
 // Returns the new node object and a bool indicating success/failure of the operation.
 // Failure only occurs if a child with the given name already exists.
-func (zn *ZNode) addChild(name string, data string) (*ZNode, bool) {
-	childZNode := ZNode{name: name, data: data, version: 1}
-
+func (zn *ZNode) addChild(name string, data string, sequential bool) (*ZNode, bool) {
 	// Check if the child already exists, and if not, find where to insert it to maintain sorted order
 	child, idx := zn.findChild(name)
 	if child != nil {
-		return &childZNode, false
+		return child, false
 	}
+
+	// If sequential, find the name
+	childName := name
+	if sequential {
+		seqNum := zn.sequenceNums[name]
+		childName += strconv.Itoa(seqNum)
+		zn.sequenceNums[name] = seqNum + 1
+	}
+
+	childZNode := ZNode{name: childName, data: data, version: 1, sequenceNums: make(map[string]int)}
 
 	zn.children = append(zn.children, &ZNode{})
 	copy(zn.children[idx+1:], zn.children[idx:])
@@ -145,6 +157,9 @@ func (pn *PanServer) StartSession(args *Args, reply *Reply) {
 }
 
 func (pn *PanServer) Create(args *rpc.CreateArgs, reply *rpc.CreateReply) {
+	pn.mu.Lock()
+	defer pn.mu.Unlock()
+
 	path := args.Path.ParsePath()
 
 	znode, idx := pn.rootZNode.lookupPrefix(path)
@@ -155,16 +170,24 @@ func (pn *PanServer) Create(args *rpc.CreateArgs, reply *rpc.CreateReply) {
 		for ; idx < len(path); idx++ {
 			// ignore the success/failure flag from addChild because already existing child should have been caught by lookupPrefix
 			if idx == len(path)-1 {
-				znode, _ = znode.addChild(path[idx], args.Data)
+				znode, _ = znode.addChild(path[idx], args.Data, args.Flags.Sequential)
+
+				// update the path with the new node name, in the case that it was sequential
+				path[len(path)-1] = znode.name
 			} else {
-				znode, _ = znode.addChild(path[idx], "")
+				znode, _ = znode.addChild(path[idx], "", false)
 			}
 		}
+
+		reply.ZNodeName = rpc.Ppath(strings.Join(path, "/"))
 		reply.Err = rpc.OK
 	}
 }
 
 func (pn *PanServer) Exists(args *rpc.ExistsArgs, reply *rpc.ExistsReply) {
+	pn.mu.Lock()
+	defer pn.mu.Unlock()
+
 	path := args.Path.ParsePath()
 	zn := pn.rootZNode.lookup(path)
 
@@ -174,6 +197,9 @@ func (pn *PanServer) Exists(args *rpc.ExistsArgs, reply *rpc.ExistsReply) {
 }
 
 func (pn *PanServer) GetData(args *rpc.GetDataArgs, reply *rpc.GetDataReply) {
+	pn.mu.Lock()
+	defer pn.mu.Unlock()
+
 	path := args.Path.ParsePath()
 	zn := pn.rootZNode.lookup(path)
 
@@ -187,6 +213,9 @@ func (pn *PanServer) GetData(args *rpc.GetDataArgs, reply *rpc.GetDataReply) {
 }
 
 func (pn *PanServer) SetData(args *rpc.SetDataArgs, reply *rpc.SetDataReply) {
+	pn.mu.Lock()
+	defer pn.mu.Unlock()
+
 	path := args.Path.ParsePath()
 	zn := pn.rootZNode.lookup(path)
 
@@ -205,6 +234,9 @@ func (pn *PanServer) SetData(args *rpc.SetDataArgs, reply *rpc.SetDataReply) {
 }
 
 func (pn *PanServer) GetChildren(args *rpc.GetChildrenArgs, reply *rpc.GetChildrenReply) {
+	pn.mu.Lock()
+	defer pn.mu.Unlock()
+
 	path := args.Path.ParsePath()
 	zn := pn.rootZNode.lookup(path)
 
@@ -218,10 +250,12 @@ func (pn *PanServer) GetChildren(args *rpc.GetChildrenArgs, reply *rpc.GetChildr
 	} else {
 		reply.Err = rpc.ErrNoFile
 	}
-
 }
 
 func (pn *PanServer) Delete(args *rpc.DeleteArgs, reply *rpc.DeleteReply) {
+	pn.mu.Lock()
+	defer pn.mu.Unlock()
+
 	path := args.Path.ParsePath()
 	// Don't allow deletion of root node
 	if len(path) <= 1 {

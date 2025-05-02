@@ -23,7 +23,7 @@ func (ck *Clerk) Create(path rpc.Ppath, data string, flags rpc.Flag) (rpc.Ppath,
 	args := rpc.CreateArgs{Path: path, Data: data, Flags: flags}
 	reply := rpc.CreateReply{}
 	ck.clnt.Call(ck.servers[0], "PanServer.Create", &args, &reply)
-	return path, rpc.OK
+	return reply.ZNodeName, reply.Err
 }
 
 // Deletes the given znode if it is at the expected version
