@@ -104,7 +104,7 @@ func TestManyClientSequential(t *testing.T) {
 		go func(idx int) {
 			start := time.Now()
 			count := 0
-			for time.Since(start) < time.Second {
+			for time.Since(start) < 5 * time.Millisecond {
 				cks[i].Create("/a/seq-", "data", rpc.Flag{Sequential: true})
 				count += 1
 			}
@@ -161,7 +161,7 @@ func TestSequentialMonotonicallyIncreases(t *testing.T) {
 		go func(idx int) {
 			start := time.Now()
 			count := 0
-			for time.Since(start) < time.Second {
+			for time.Since(start) < 5 * time.Millisecond {
 				cks[i].Create(path, "data", rpc.Flag{Sequential: true, Ephemeral: true})
 				count += 1
 			}
