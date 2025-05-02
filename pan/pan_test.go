@@ -9,7 +9,7 @@ import (
 	// "6.5840/kvraft1/rsm"
 	// "6.5840/kvsrv1/rpc"
 	// "6.5840/rpc.
-	// tester "6.5840/tester1"
+	tester "6.5840/tester1"
 
 	"pan/panapi"
 	"pan/panapi/rpc"
@@ -104,7 +104,7 @@ func TestManyClientSequential(t *testing.T) {
 		go func(idx int) {
 			start := time.Now()
 			count := 0
-			for time.Since(start) < time.Second {
+			for time.Since(start) < 5 * time.Millisecond {
 				cks[i].Create("/a/seq-", "data", rpc.Flag{Sequential: true})
 				count += 1
 			}
@@ -161,7 +161,7 @@ func TestSequentialMonotonicallyIncreases(t *testing.T) {
 		go func(idx int) {
 			start := time.Now()
 			count := 0
-			for time.Since(start) < time.Second {
+			for time.Since(start) < 5 * time.Millisecond {
 				cks[i].Create(path, "data", rpc.Flag{Sequential: true, Ephemeral: true})
 				count += 1
 			}
@@ -180,4 +180,115 @@ func TestSequentialMonotonicallyIncreases(t *testing.T) {
 	if err != rpc.OK || fname != rpc.Ppath(fmt.Sprintf("/b/seq-%d", c0+c1+c2)) {
 		ts.t.Fatalf("Created %s when %d previous ephermeral znodes were created", fname, c0+c1+c2)
 	}
+}
+
+func (ts *Test) GenericTest() {
+	const (
+		NITER  = 3
+		NSEC   = 1
+		T      = NSEC * time.Second
+		NFILES = 100
+	)
+	defer ts.Cleanup()
+
+	ch_partitioner := make(chan bool)
+	ch_spawn := make(chan panapi.TestType)
+	ch_crash := make(chan struct{})
+	ch_err := make(chan string)
+	ck := ts.MakeClerk()
+	for i := 0; i < NITER; i++ {
+		file := rpc.Ppath(fmt.Sprintf("/a/b%d/f-", i))
+		go func() {
+			tt := ts.StartSessionsAndWait(ts.nclients, T, file, ts.clientCrash, ch_err)
+			ch_spawn <- tt
+		}()
+
+		// Let clients perform ops without interruption
+		time.Sleep(100 * time.Millisecond)
+
+		if ts.leaderCrash {
+			go func() {
+				for i := 0; i < ts.nservers; i++ {
+					ts.Group(Gid).ShutdownServer(i)
+					time.Sleep(T)
+					ts.Group(Gid).StartServer(i)
+				}
+				ts.Group(Gid).ConnectAll()
+				ch_crash <- struct{}{}
+			}()
+		}
+
+		if ts.partitions {
+			go ts.Partitioner(Gid, ch_partitioner)
+		}
+
+		if ts.leaderCrash {
+			<-ch_crash // waits for leaders to stop crashing
+		}
+		var res panapi.TestType
+		select {
+		case res = <-ch_spawn:
+		case err_msg := <-ch_err:
+			ts.t.Fatal(err_msg)
+		}
+
+		if ts.partitions {
+			// this if block ends the partitioning
+			ch_partitioner <- true
+			<-ch_partitioner
+			ts.Group(Gid).ConnectAll()
+			time.Sleep(T)
+		}
+
+		// at this point, all network should be good
+		ts.CheckRes(ck, res, file)
+	}
+}
+
+func TestNoErrors(t *testing.T) {
+	ts := MakeTest(t, "No Unreliability", 3, 5, true, false, false, false, -1, false)
+	tester.AnnotateTest("TestNoErrors", 5)
+	ts.GenericTest()
+}
+
+func TestClientCrashes(t *testing.T) {
+	ts := MakeTest(t, "Test Client Crashes", 3, 5, true, false, true, false, -1, false)
+	tester.AnnotateTest("TestClientCrashes", 5)
+	ts.GenericTest()
+}
+
+func TestLeaderCrashes(t *testing.T) {
+	ts := MakeTest(t, "Test Leader Crashes", 3, 5, true, true, false, false, -1, false)
+	tester.AnnotateTest("TestLeaderCrashes", 5)
+	ts.GenericTest()
+}
+
+func TestPartitions(t *testing.T) {
+	ts := MakeTest(t, "Test Partitions", 3, 5, true, false, false, true, -1, false)
+	tester.AnnotateTest("TestPartitions", 5)
+	ts.GenericTest()
+}
+
+func TestClientCrashesLeaderCrashes(t *testing.T) {
+	ts := MakeTest(t, "Test Client and Leader Crashes", 3, 5, true, true, true, false, -1, false)
+	tester.AnnotateTest("TestClientCrashesLeaderCrashes", 5)
+	ts.GenericTest()
+}
+
+func TestClientCrashesWithPartitions(t *testing.T) {
+	ts := MakeTest(t, "Test Client Crashes and Partitions", 3, 5, true, false, true, true, -1, false)
+	tester.AnnotateTest("TestClientCrashesWithPartitions", 5)
+	ts.GenericTest()
+}
+
+func TestLeaderCrashesWithPartitions(t *testing.T) {
+	ts := MakeTest(t, "Test Leader Crashes and Partitions", 3, 5, true, true, false, true, -1, false)
+	tester.AnnotateTest("TestLeaderCrashesWithPartitions", 5)
+	ts.GenericTest()
+}
+
+func TestClientCrashesLeaderCrashesWithPartitions(t *testing.T) {
+	ts := MakeTest(t, "Test Client Crashes and Leader Crashes and Partitions", 3, 5, true, true, true, true, -1, false)
+	tester.AnnotateTest("TestClientCrashesLeaderCrashesWithPartitions", 5)
+	ts.GenericTest()
 }

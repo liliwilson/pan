@@ -14,3 +14,9 @@ Following partitions are more specific
   - files are ephemeral or not
 
 IF TIME: Check for linearizability
+
+Tests for partitions
+Tests for leader crashes
+Tests for client crashes
+Tests for watches -- channels
+Tests for crashes
