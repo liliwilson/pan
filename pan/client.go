@@ -98,7 +98,7 @@ func (ck *Session) maintainSession() {
 }
 
 func MakeSession(clnt *tester.Clnt, servers []string) panapi.IPNSession {
-	ck := &Session{clnt: clnt, servers: servers, id: uuid.New().String(), keepAliveInterval: time.Second} // TODO change the keepalive interval
+	ck := &Session{clnt: clnt, servers: servers, id: uuid.New().String(), keepAliveInterval: 100 * time.Millisecond}
 
 	// Notify the server of a new session
 	args := rpc.SessionArgs{SessionId: ck.id}

@@ -154,7 +154,7 @@ func (pn *PanServer) Snapshot() []byte {
 }
 
 func newSessionTimeout() time.Time {
-	timeout := 10 * time.Second // TODO change this timeout
+	timeout := 1 * time.Second
 	return time.Now().Add(timeout)
 }
 
