@@ -195,7 +195,7 @@ func (ts *Test) GenericTest() {
 	ch_spawn := make(chan panapi.TestType)
 	ch_crash := make(chan struct{})
 	ch_err := make(chan string)
-	ck := ts.MakeClerk()
+	ck := ts.MakeSession()
 	for i := 0; i < NITER; i++ {
 		file := rpc.Ppath(fmt.Sprintf("/a/b%d/f-", i))
 		go func() {

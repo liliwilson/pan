@@ -126,7 +126,7 @@ type TestType struct {
 	Expected  int
 }
 
-func (ts *Test) CheckRes(ck IPNClerk, res TestType, file rpc.Ppath) {
+func (ts *Test) CheckRes(ck IPNSession, res TestType, file rpc.Ppath) {
 	children, _ := ck.GetChildren(file, false)
 	if len(children) != len(res.Remaining) {
 		ts.t.Fatalf("Number of children: %d, number of remaining ephemeral znodes: %d\n", len(children), len(res.Remaining))
@@ -152,7 +152,7 @@ func (ts *Test) StartSessionsAndWait(nclnt int, t time.Duration, file rpc.Ppath,
 	for i := range nclnt {
 		ch_path[i] = make(chan []rpc.Ppath)
 		go func() {
-			session := ts.MakeClerk()
+			session := ts.MakeSession()
 			paths := make([]rpc.Ppath, 0)
 			for range ITERS {
 				iter_paths := make([]rpc.Ppath, 0)
@@ -165,7 +165,7 @@ func (ts *Test) StartSessionsAndWait(nclnt int, t time.Duration, file rpc.Ppath,
 				} else {
 					paths = append(paths, iter_paths...)
 				}
-				session = ts.MakeClerk()
+				session = ts.MakeSession()
 			}
 			ch_path[i] <- paths
 		}()
@@ -185,7 +185,7 @@ func (ts *Test) StartSessionsAndWait(nclnt int, t time.Duration, file rpc.Ppath,
 	return TestType{Remaining: remaining, Expected: PERITER * ITERS * nclnt}
 }
 
-func (ts *Test) Crash(session IPNClerk) {
-	testSession := session.(*TestClerk)
+func (ts *Test) Crash(session IPNSession) {
+	testSession := session.(*TestSession)
 	testSession.Clnt.DisconnectAll()
 }
