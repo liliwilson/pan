@@ -19,7 +19,7 @@ func RandValue(n int) string {
 	return string(b)
 }
 
-type IPNClerk interface {
+type IPNSession interface {
 	Create(path rpc.Ppath, data string, flags rpc.Flag) (rpc.Ppath, rpc.Err)
 
 	Delete(path rpc.Ppath, version rpc.Pversion) rpc.Err
@@ -39,28 +39,28 @@ type IPNClerk interface {
 	EndSession()
 }
 
-type TestClerk struct {
-	IPNClerk
+type TestSession struct {
+	IPNSession
 	Clnt *tester.Clnt
 }
 
-type IClerkMaker interface {
-	MakeClerk() IPNClerk
-	DeleteClerk(IPNClerk)
+type ISessionMaker interface {
+	MakeSession() IPNSession
+	DeleteSession(IPNSession)
 }
 
 type Test struct {
 	*tester.Config
 	t           *testing.T
-	mck         IClerkMaker
+	mck         ISessionMaker
 	randomfiles bool
 }
 
-func MakeTest(t *testing.T, cfg *tester.Config, randomfiles bool, mck IClerkMaker) *Test {
+func MakeTest(t *testing.T, cfg *tester.Config, randomfiles bool, mck ISessionMaker) *Test {
 	ts := &Test{
-		Config: cfg,
-		t: t,
-		mck: mck,
+		Config:      cfg,
+		t:           t,
+		mck:         mck,
 		randomfiles: randomfiles,
 	}
 	return ts
@@ -77,6 +77,6 @@ func (ts *Test) ConnectClnts(clnts []*tester.Clnt) {
 	}
 }
 
-func (ts *Test) MakeClerk() IPNClerk {
-	return ts.mck.MakeClerk()
+func (ts *Test) MakeSession() IPNSession {
+	return ts.mck.MakeSession()
 }

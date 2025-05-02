@@ -23,7 +23,7 @@ const (
 	ErrSessionClosed = "ErrSessionClosed"
 	ErrDeleteRoot    = "ErrDeleteRoot"
 
-	// Err returned by Clerk only
+	// Err returned by Session only
 	ErrMaybe = "ErrMaybe"
 
 	// For future kvraft lab
