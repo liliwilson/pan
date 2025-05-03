@@ -14,6 +14,7 @@ import (
 	"6.5840/labgob"
 	"6.5840/labrpc"
 	tester "6.5840/tester1"
+	"github.com/google/uuid"
 )
 
 type ZNode struct {
@@ -265,8 +266,11 @@ func (pn *PanServer) applyStartSession(args *rpc.StartSessionArgs, reply *rpc.St
 	pn.mu.Lock()
 	defer pn.mu.Unlock()
 
-	pn.sessions[args.SessionId] = newSessionTimeout(timestamp)
+	sessionId := uuid.New().String()
+	pn.sessions[sessionId] = newSessionTimeout(timestamp)
+
 	reply.Err = rpc.OK
+	reply.SessionId = sessionId
 }
 
 // Create a znode.

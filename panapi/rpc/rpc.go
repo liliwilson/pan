@@ -37,11 +37,11 @@ const (
 )
 
 type StartSessionArgs struct {
-	SessionId string
 }
 
 type StartSessionReply struct {
-	Err Err
+	SessionId string
+	Err       Err
 }
 
 type EndSessionArgs struct {

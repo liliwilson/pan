@@ -9,7 +9,6 @@ import (
 	"time"
 
 	tester "6.5840/tester1"
-	"github.com/google/uuid"
 )
 
 type Session struct {
@@ -176,15 +175,16 @@ func (ck *Session) maintainSession() {
 }
 
 func MakeSession(clnt *tester.Clnt, servers []string) panapi.IPNSession {
-	ck := &Session{clnt: clnt, servers: servers, id: uuid.New().String(), keepAliveInterval: 100 * time.Millisecond}
+	ck := &Session{clnt: clnt, servers: servers, keepAliveInterval: 100 * time.Millisecond}
 
 	// Notify the server of a new session
-	args := rpc.StartSessionArgs{SessionId: ck.id}
+	args := rpc.StartSessionArgs{}
 	reply := rpc.StartSessionReply{}
 	for {
 		leader := ck.getLeader()
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.StartSession", &args, &reply)
 		if ok && reply.Err != rpc.ErrWrongLeader {
+			ck.id = reply.SessionId
 			break
 		}
 		ck.incrementLeader()
