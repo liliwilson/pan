@@ -367,10 +367,27 @@ func (pn *PanServer) killed() bool {
 	return z == 1
 }
 
+// Long-running go routine for cleaning up timed out sessions.
+func (pn *PanServer) monitorSessions() {
+	for !pn.killed() {
+		pn.mu.Lock()
+		for session, timeout := range pn.sessions {
+			if time.Now().After(timeout) {
+				pn.cleanupSession(session)
+			}
+		}
+		pn.mu.Unlock()
+
+		time.Sleep(50 * time.Millisecond)
+	}
+}
+
 // Must return quickly
 func StartPanServer(servers []*labrpc.ClientEnd, gid tester.Tgid, me int, persister *tester.Persister, maxraftstate int) []tester.IService {
 	pn := &PanServer{me: me, peers: servers, rootZNode: &ZNode{name: ""}, sessions: make(map[string]time.Time), ephemeralNodes: make(map[string][]rpc.Ppath)}
 	pn.rsm = rsm.MakeRSM(servers, me, persister, maxraftstate, pn)
+
+	go pn.monitorSessions()
 
 	return []tester.IService{pn, pn.rsm.Raft()}
 }
