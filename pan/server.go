@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"6.5840/kvraft1/rsm"
+	"6.5840/labgob"
 	"6.5840/labrpc"
 	tester "6.5840/tester1"
 )
@@ -137,13 +138,73 @@ type PanServer struct {
 	// ZK data structures
 	mu             sync.Mutex
 	rootZNode      *ZNode
-	sessions       map[string]time.Time   // map session ID to timeout?
+	sessions       map[string]time.Time   // map session ID to timeout
 	dataWatches    map[rpc.Ppath][]*Watch // map path to list of data watches on that path
 	childWatches   map[rpc.Ppath][]*Watch // map path to list of child watches on that path
 	ephemeralNodes map[string][]rpc.Ppath // map session IDs to list of ephemeral znode paths
 }
 
-func (pn *PanServer) DoOp(req any) any {
+type TimestampedRequest struct {
+	Timestamp int64 // int64 instead of time.Time to appease raft lab encoding
+	Request   any
+}
+
+func (pn *PanServer) DoOp(tsReq any) any {
+	// fmt.Printf("S%d doing op %+v\n", pn.me, tsReq)
+	switch tsReq.(type) {
+	case TimestampedRequest:
+		tsReq := tsReq.(TimestampedRequest)
+		timestamp := time.UnixMicro(tsReq.Timestamp)
+		req := tsReq.Request
+		switch req.(type) {
+		case rpc.StartSessionArgs:
+			req := req.(rpc.StartSessionArgs)
+			reply := rpc.StartSessionReply{}
+			pn.applyStartSession(&req, &reply, timestamp)
+			return &reply
+		case rpc.EndSessionArgs:
+			req := req.(rpc.EndSessionArgs)
+			reply := rpc.EndSessionReply{}
+			pn.applyEndSession(&req, &reply)
+			return &reply
+		case rpc.KeepAliveArgs:
+			req := req.(rpc.KeepAliveArgs)
+			reply := rpc.KeepAliveReply{}
+			pn.applyKeepAlive(&req, &reply, timestamp)
+			return &reply
+		case rpc.CreateArgs:
+			req := req.(rpc.CreateArgs)
+			reply := rpc.CreateReply{}
+			pn.applyCreate(&req, &reply, timestamp)
+			return &reply
+		case rpc.ExistsArgs:
+			req := req.(rpc.ExistsArgs)
+			reply := rpc.ExistsReply{}
+			pn.applyExists(&req, &reply, timestamp)
+			return &reply
+		case rpc.GetDataArgs:
+			req := req.(rpc.GetDataArgs)
+			reply := rpc.GetDataReply{}
+			pn.applyGetData(&req, &reply, timestamp)
+			return &reply
+		case rpc.SetDataArgs:
+			req := req.(rpc.SetDataArgs)
+			reply := rpc.SetDataReply{}
+			pn.applySetData(&req, &reply, timestamp)
+			return &reply
+		case rpc.GetChildrenArgs:
+			req := req.(rpc.GetChildrenArgs)
+			reply := rpc.GetChildrenReply{}
+			pn.applyGetChildren(&req, &reply, timestamp)
+			return &reply
+		case rpc.DeleteArgs:
+			req := req.(rpc.DeleteArgs)
+			reply := rpc.DeleteReply{}
+			pn.applyDelete(&req, &reply, timestamp)
+			return &reply
+		}
+	}
+
 	return ""
 }
 
@@ -153,21 +214,22 @@ func (pn *PanServer) Snapshot() []byte {
 	return make([]byte, 0)
 }
 
-func newSessionTimeout() time.Time {
-	timeout := 1 * time.Second
-	return time.Now().Add(timeout)
+// Sets a new session timeout, given that we last heard from the client at the given timestamp.
+func newSessionTimeout(timestamp time.Time) time.Time {
+	timeout := 5 * time.Second
+	return timestamp.Add(timeout)
 }
 
 // Given a session id, returns true iff the session is still live.
 // Resets the session timeout if the session is live.
-func (pn *PanServer) checkSession(sessionId string) bool {
+func (pn *PanServer) checkSession(sessionId string, timestamp time.Time) bool {
 	timeout, ok := pn.sessions[sessionId]
-	if !ok || time.Now().After(timeout) {
+	if !ok || timestamp.After(timeout) {
 		pn.cleanupSession(sessionId)
 		return false
 	}
 
-	pn.sessions[sessionId] = newSessionTimeout()
+	pn.sessions[sessionId] = newSessionTimeout(timestamp)
 	return true
 }
 
@@ -181,7 +243,6 @@ func (pn *PanServer) cleanupSession(sessionId string) {
 		if parentNode != nil {
 			parentNode.removeChild(path[len(path)-1], 0, false)
 		}
-
 	}
 
 	delete(pn.sessions, sessionId)
@@ -189,19 +250,44 @@ func (pn *PanServer) cleanupSession(sessionId string) {
 }
 
 // Start a session for a given client. Returns a session ID.
-func (pn *PanServer) StartSession(args *rpc.SessionArgs, reply *rpc.SessionReply) {
-	pn.mu.Lock()
-	defer pn.mu.Unlock()
+func (pn *PanServer) StartSession(args *rpc.StartSessionArgs, reply *rpc.StartSessionReply) {
+	tsReq := TimestampedRequest{Timestamp: time.Now().UnixMicro(), Request: *args}
+	err, res := pn.rsm.Submit(tsReq)
 
-	pn.sessions[args.SessionId] = newSessionTimeout()
+	if err == rpc.ErrWrongLeader {
+		reply.Err = rpc.ErrWrongLeader
+	} else {
+		*reply = *(res.(*rpc.StartSessionReply))
+	}
 }
 
-func (pn *PanServer) Create(args *rpc.CreateArgs, reply *rpc.CreateReply) {
+func (pn *PanServer) applyStartSession(args *rpc.StartSessionArgs, reply *rpc.StartSessionReply, timestamp time.Time) {
 	pn.mu.Lock()
 	defer pn.mu.Unlock()
 
-	if !pn.checkSession(args.SessionId) {
+	pn.sessions[args.SessionId] = newSessionTimeout(timestamp)
+	reply.Err = rpc.OK
+}
+
+// Create a znode.
+func (pn *PanServer) Create(args *rpc.CreateArgs, reply *rpc.CreateReply) {
+	tsReq := TimestampedRequest{Timestamp: time.Now().UnixMicro(), Request: *args}
+	err, res := pn.rsm.Submit(tsReq)
+
+	if err == rpc.ErrWrongLeader {
+		reply.Err = rpc.ErrWrongLeader
+	} else {
+		*reply = *(res.(*rpc.CreateReply))
+	}
+}
+
+func (pn *PanServer) applyCreate(args *rpc.CreateArgs, reply *rpc.CreateReply, timestamp time.Time) {
+	pn.mu.Lock()
+	defer pn.mu.Unlock()
+
+	if !pn.checkSession(args.SessionId, timestamp) {
 		reply.Err = rpc.ErrSessionClosed
+		return
 	}
 
 	path := args.Path.ParsePath()
@@ -232,12 +318,25 @@ func (pn *PanServer) Create(args *rpc.CreateArgs, reply *rpc.CreateReply) {
 	}
 }
 
+// Check if a given znode exists.
 func (pn *PanServer) Exists(args *rpc.ExistsArgs, reply *rpc.ExistsReply) {
+	tsReq := TimestampedRequest{Timestamp: time.Now().UnixMicro(), Request: *args}
+	err, res := pn.rsm.Submit(tsReq)
+
+	if err == rpc.ErrWrongLeader {
+		reply.Err = rpc.ErrWrongLeader
+	} else {
+		*reply = *(res.(*rpc.ExistsReply))
+	}
+}
+
+func (pn *PanServer) applyExists(args *rpc.ExistsArgs, reply *rpc.ExistsReply, timestamp time.Time) {
 	pn.mu.Lock()
 	defer pn.mu.Unlock()
 
-	if !pn.checkSession(args.SessionId) {
+	if !pn.checkSession(args.SessionId, timestamp) {
 		reply.Err = rpc.ErrSessionClosed
+		return
 	}
 
 	path := args.Path.ParsePath()
@@ -248,12 +347,25 @@ func (pn *PanServer) Exists(args *rpc.ExistsArgs, reply *rpc.ExistsReply) {
 	reply.Err = rpc.OK
 }
 
+// Get the data for a given znode.
 func (pn *PanServer) GetData(args *rpc.GetDataArgs, reply *rpc.GetDataReply) {
+	tsReq := TimestampedRequest{Timestamp: time.Now().UnixMicro(), Request: *args}
+	err, res := pn.rsm.Submit(tsReq)
+
+	if err == rpc.ErrWrongLeader {
+		reply.Err = rpc.ErrWrongLeader
+	} else {
+		*reply = *(res.(*rpc.GetDataReply))
+	}
+}
+
+func (pn *PanServer) applyGetData(args *rpc.GetDataArgs, reply *rpc.GetDataReply, timestamp time.Time) {
 	pn.mu.Lock()
 	defer pn.mu.Unlock()
 
-	if !pn.checkSession(args.SessionId) {
+	if !pn.checkSession(args.SessionId, timestamp) {
 		reply.Err = rpc.ErrSessionClosed
+		return
 	}
 
 	path := args.Path.ParsePath()
@@ -266,14 +378,28 @@ func (pn *PanServer) GetData(args *rpc.GetDataArgs, reply *rpc.GetDataReply) {
 	} else {
 		reply.Err = rpc.ErrNoFile
 	}
+
 }
 
+// Set the data for a given znode.
 func (pn *PanServer) SetData(args *rpc.SetDataArgs, reply *rpc.SetDataReply) {
+	tsReq := TimestampedRequest{Timestamp: time.Now().UnixMicro(), Request: *args}
+	err, res := pn.rsm.Submit(tsReq)
+
+	if err == rpc.ErrWrongLeader {
+		reply.Err = rpc.ErrWrongLeader
+	} else {
+		*reply = *(res.(*rpc.SetDataReply))
+	}
+}
+
+func (pn *PanServer) applySetData(args *rpc.SetDataArgs, reply *rpc.SetDataReply, timestamp time.Time) {
 	pn.mu.Lock()
 	defer pn.mu.Unlock()
 
-	if !pn.checkSession(args.SessionId) {
+	if !pn.checkSession(args.SessionId, timestamp) {
 		reply.Err = rpc.ErrSessionClosed
+		return
 	}
 
 	path := args.Path.ParsePath()
@@ -293,12 +419,25 @@ func (pn *PanServer) SetData(args *rpc.SetDataArgs, reply *rpc.SetDataReply) {
 	}
 }
 
+// Get the children for a given znode.
 func (pn *PanServer) GetChildren(args *rpc.GetChildrenArgs, reply *rpc.GetChildrenReply) {
+	tsReq := TimestampedRequest{Timestamp: time.Now().UnixMicro(), Request: *args}
+	err, res := pn.rsm.Submit(tsReq)
+
+	if err == rpc.ErrWrongLeader {
+		reply.Err = rpc.ErrWrongLeader
+	} else {
+		*reply = *(res.(*rpc.GetChildrenReply))
+	}
+}
+
+func (pn *PanServer) applyGetChildren(args *rpc.GetChildrenArgs, reply *rpc.GetChildrenReply, timestamp time.Time) {
 	pn.mu.Lock()
 	defer pn.mu.Unlock()
 
-	if !pn.checkSession(args.SessionId) {
+	if !pn.checkSession(args.SessionId, timestamp) {
 		reply.Err = rpc.ErrSessionClosed
+		return
 	}
 
 	path := args.Path.ParsePath()
@@ -316,12 +455,25 @@ func (pn *PanServer) GetChildren(args *rpc.GetChildrenArgs, reply *rpc.GetChildr
 	}
 }
 
+// Delete a given znode.
 func (pn *PanServer) Delete(args *rpc.DeleteArgs, reply *rpc.DeleteReply) {
+	tsReq := TimestampedRequest{Timestamp: time.Now().UnixMicro(), Request: *args}
+	err, res := pn.rsm.Submit(tsReq)
+
+	if err == rpc.ErrWrongLeader {
+		reply.Err = rpc.ErrWrongLeader
+	} else {
+		*reply = *(res.(*rpc.DeleteReply))
+	}
+}
+
+func (pn *PanServer) applyDelete(args *rpc.DeleteArgs, reply *rpc.DeleteReply, timestamp time.Time) {
 	pn.mu.Lock()
 	defer pn.mu.Unlock()
 
-	if !pn.checkSession(args.SessionId) {
+	if !pn.checkSession(args.SessionId, timestamp) {
 		reply.Err = rpc.ErrSessionClosed
+		return
 	}
 
 	path := args.Path.ParsePath()
@@ -341,23 +493,47 @@ func (pn *PanServer) Delete(args *rpc.DeleteArgs, reply *rpc.DeleteReply) {
 }
 
 // Reset the timeout for a given session.
-func (pn *PanServer) KeepAlive(args *rpc.SessionArgs, reply *rpc.SessionReply) {
+func (pn *PanServer) KeepAlive(args *rpc.KeepAliveArgs, reply *rpc.KeepAliveReply) {
+	tsReq := TimestampedRequest{Timestamp: time.Now().UnixMicro(), Request: *args}
+	err, res := pn.rsm.Submit(tsReq)
+
+	if err == rpc.ErrWrongLeader {
+		reply.Err = rpc.ErrWrongLeader
+	} else {
+		*reply = *(res.(*rpc.KeepAliveReply))
+	}
+}
+
+func (pn *PanServer) applyKeepAlive(args *rpc.KeepAliveArgs, reply *rpc.KeepAliveReply, timestamp time.Time) {
 	pn.mu.Lock()
 	defer pn.mu.Unlock()
 
-	if !pn.checkSession(args.SessionId) {
+	if !pn.checkSession(args.SessionId, timestamp) {
 		reply.Err = rpc.ErrSessionClosed
 	}
 }
 
 // End the session with a given sessionId.
-func (pn *PanServer) EndSession(args *rpc.SessionArgs, reply *rpc.SessionReply) {
+func (pn *PanServer) EndSession(args *rpc.EndSessionArgs, reply *rpc.EndSessionReply) {
+	tsReq := TimestampedRequest{Timestamp: time.Now().UnixMicro(), Request: *args}
+	err, res := pn.rsm.Submit(tsReq)
+
+	if err == rpc.ErrWrongLeader {
+		reply.Err = rpc.ErrWrongLeader
+	} else {
+		*reply = *(res.(*rpc.EndSessionReply))
+	}
+}
+
+func (pn *PanServer) applyEndSession(args *rpc.EndSessionArgs, reply *rpc.EndSessionReply) {
 	pn.mu.Lock()
 	defer pn.mu.Unlock()
 
 	pn.cleanupSession(args.SessionId)
+	reply.Err = rpc.OK
 }
 
+// Kill this server.
 func (pn *PanServer) Kill() {
 	atomic.StoreInt32(&pn.dead, 1)
 }
@@ -384,6 +560,18 @@ func (pn *PanServer) monitorSessions() {
 
 // Must return quickly
 func StartPanServer(servers []*labrpc.ClientEnd, gid tester.Tgid, me int, persister *tester.Persister, maxraftstate int) []tester.IService {
+	labgob.Register(rsm.Op{})
+	labgob.Register(rpc.StartSessionArgs{})
+	labgob.Register(rpc.EndSessionArgs{})
+	labgob.Register(rpc.KeepAliveArgs{})
+	labgob.Register(rpc.CreateArgs{})
+	labgob.Register(rpc.ExistsArgs{})
+	labgob.Register(rpc.GetDataArgs{})
+	labgob.Register(rpc.SetDataArgs{})
+	labgob.Register(rpc.GetChildrenArgs{})
+	labgob.Register(rpc.DeleteArgs{})
+	labgob.Register(TimestampedRequest{})
+
 	pn := &PanServer{me: me, peers: servers, rootZNode: &ZNode{name: ""}, sessions: make(map[string]time.Time), ephemeralNodes: make(map[string][]rpc.Ppath)}
 	pn.rsm = rsm.MakeRSM(servers, me, persister, maxraftstate, pn)
 

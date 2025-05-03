@@ -36,11 +36,27 @@ const (
 	ErrWrongGroup  = "ErrWrongGroup"
 )
 
-type SessionArgs struct {
+type StartSessionArgs struct {
 	SessionId string
 }
 
-type SessionReply struct {
+type StartSessionReply struct {
+	Err Err
+}
+
+type EndSessionArgs struct {
+	SessionId string
+}
+
+type EndSessionReply struct {
+	Err Err
+}
+
+type KeepAliveArgs struct {
+	SessionId string
+}
+
+type KeepAliveReply struct {
 	Err Err
 }
 
