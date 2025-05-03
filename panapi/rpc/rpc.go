@@ -13,10 +13,30 @@ func (path *Ppath) ParsePath() []string {
 	return strings.Split(string(*path), "/")
 }
 
+func (path *Ppath) Suffix() string {
+	dirs := path.ParsePath()
+	return dirs[len(dirs) - 1]
+}
+
 type Watch struct {
 	ShouldWatch bool
-	Callback    func()
+	Callback    func(WatchArgs)
 }
+
+type WatchArgs struct {
+	IsGetData bool
+	NewData   string
+
+	IsExists bool
+
+	IsGetChildren bool
+	NewChildren   []Ppath
+
+	// Should be set for all three events
+	ZNodeExists bool
+}
+
+func EmptyWatch(_ WatchArgs) {}
 
 type Err string
 

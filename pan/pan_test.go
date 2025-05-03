@@ -3,6 +3,7 @@ package pan
 import (
 	"fmt"
 	"reflect"
+	"slices"
 	"testing"
 	"time"
 
@@ -37,47 +38,47 @@ func TestBasic(t *testing.T) {
 	ck.Create("/a", "", rpc.Flag{})
 	ck.Create("/a/b", "hello", rpc.Flag{})
 
-	exists, _ := ck.Exists("/a", rpc.Watch{ShouldWatch: false, Callback: func() {}})
+	exists, _ := ck.Exists("/a", rpc.Watch{ShouldWatch: false, Callback: func(wa rpc.WatchArgs) {}})
 	if !exists {
 		ts.t.Fatalf("/a should exist\n")
 	}
 
-	exists, _ = ck.Exists("/a/b", rpc.Watch{ShouldWatch:false, Callback: func() {}})
+	exists, _ = ck.Exists("/a/b", rpc.Watch{ShouldWatch:false, Callback: func(wa rpc.WatchArgs) {}})
 	if !exists {
 		ts.t.Fatalf("/a/b should exist\n")
 	}
 
-	exists, _ = ck.Exists("/a/b/c", rpc.Watch{ShouldWatch: false, Callback: func() {}})
+	exists, _ = ck.Exists("/a/b/c", rpc.Watch{ShouldWatch: false, Callback: func(wa rpc.WatchArgs) {}})
 	if exists {
 		ts.t.Fatalf("/a/b/c should not exist\n")
 	}
 
-	exists, _ = ck.Exists("/a/c", rpc.Watch{ShouldWatch: false, Callback: func() {}})
+	exists, _ = ck.Exists("/a/c", rpc.Watch{ShouldWatch: false, Callback: func(wa rpc.WatchArgs) {}})
 	if exists {
 		ts.t.Fatalf("/a/c should not exist\n")
 	}
 
 	// Test GetData
-	data, version, _ := ck.GetData("/a/b", rpc.Watch{ShouldWatch: false, Callback: func() {}})
+	data, version, _ := ck.GetData("/a/b", rpc.Watch{ShouldWatch: false, Callback: func(wa rpc.WatchArgs) {}})
 	if ok, err := compareGetData("/a/b", "hello", 1, data, version); !ok {
 		ts.t.Fatal(err)
 	}
 	// TestSetData
 	ck.SetData("/a/b", "bye", 1)
-	data, version, _ = ck.GetData("/a/b", rpc.Watch{ShouldWatch: false, Callback: func() {}})
+	data, version, _ = ck.GetData("/a/b", rpc.Watch{ShouldWatch: false, Callback: func(wa rpc.WatchArgs) {}})
 	if ok, err := compareGetData("/a/b", "bye", 2, data, version); !ok {
 		ts.t.Fatal(err)
 	}
 	// Test Get Children
 	ck.Create("/a/c", "1", rpc.Flag{})
 	ck.Create("/a/d", "2", rpc.Flag{})
-	children, _ := ck.GetChildren("/a", rpc.Watch{ShouldWatch: false, Callback: func() {}})
+	children, _ := ck.GetChildren("/a", rpc.Watch{ShouldWatch: false, Callback: func(wa rpc.WatchArgs) {}})
 	if ok, err := compareGetChildren("/a", []rpc.Ppath{"b", "c", "d"}, children); !ok {
 		ts.t.Fatal(err)
 	}
 	// Test Delete and Exists
 	ck.Delete("/a/b", 2)
-	exists, _ = ck.Exists("/a/b", rpc.Watch{ShouldWatch: false, Callback: func() {}})
+	exists, _ = ck.Exists("/a/b", rpc.Watch{ShouldWatch: false, Callback: func(wa rpc.WatchArgs) {}})
 	if exists {
 		ts.t.Fatal("/a/b should not exist\n")
 	}
@@ -128,7 +129,7 @@ func TestEphemeral(t *testing.T) {
 	path := rpc.Ppath("/a/testEpheral")
 	ck1 := ts.MakeSession()
 	ck1.Create(path, "data", rpc.Flag{Ephemeral: true})
-	exists, _ := ck1.Exists(path, rpc.Watch{ShouldWatch: false, Callback: func() {}})
+	exists, _ := ck1.Exists(path, rpc.Watch{ShouldWatch: false, Callback: func(wa rpc.WatchArgs) {}})
 	if !exists {
 		ts.t.Fatal("Znode is missing after creation\n")
 	}
@@ -136,7 +137,7 @@ func TestEphemeral(t *testing.T) {
 	// Allow session end to propogate
 	time.Sleep(time.Second * 1)
 	ck := ts.MakeSession()
-	exists, _ = ck.Exists(path, rpc.Watch{ShouldWatch: false, Callback: func() {}})
+	exists, _ = ck.Exists(path, rpc.Watch{ShouldWatch: false, Callback: func(wa rpc.WatchArgs) {}})
 	if exists {
 		ts.t.Fatal("Ephemeral znode exists after creator disconnected\n")
 	}
@@ -172,7 +173,7 @@ func TestSequentialMonotonicallyIncreases(t *testing.T) {
 	c0 := <-chs[0]
 	c1 := <-chs[1]
 	c2 := <-chs[2]
-	children, err := ck.GetChildren("/b", rpc.Watch{ShouldWatch: false, Callback: func() {}})
+	children, err := ck.GetChildren("/b", rpc.Watch{ShouldWatch: false, Callback: func(wa rpc.WatchArgs) {}})
 	if err != rpc.OK || len(children) > 0 {
 		ts.t.Fatal("/b should have no children after nodes crashed\n")
 	}
@@ -292,4 +293,151 @@ func TestClientCrashesLeaderCrashesWithPartitions(t *testing.T) {
 	ts := MakeTest(t, "Test Client Crashes and Leader Crashes and Partitions", 3, 5, true, true, true, true, -1, false)
 	tester.AnnotateTest("TestClientCrashesLeaderCrashesWithPartitions", 5)
 	ts.GenericTest()
+}
+
+func TestWatch(t *testing.T) {
+	ts := MakeTest(t, "Test Watches on all three functions", 3, 5, true, false, false, false, -1, false)
+	tester.AnnotateTest("TestWatchBasic", 5)
+	defer ts.Cleanup()
+
+	ck := ts.MakeSession()
+	const (NITERS = 300)
+	for i := range NITERS {
+		dir := rpc.Ppath(fmt.Sprintf("/a/b%d", i))
+		ck.Create(dir, "init", rpc.Flag{})
+		if i % 3 == 0 { // Exists
+			testfile := dir + "/create"
+			ch_create := make(chan struct{})
+			ck.Exists(testfile, rpc.Watch{ShouldWatch: true, Callback: func(_ rpc.WatchArgs) {
+				ch_create <- struct{}{}
+			}})
+			ck.Create(testfile, "start", rpc.Flag{})
+			<-ch_create
+			exists, _ := ck.Exists(testfile, rpc.Watch{ShouldWatch: false, Callback: rpc.EmptyWatch})
+			if !exists {
+				ts.t.Fatalf("%s does not exist after watch signalling creation", testfile)
+			}
+			ck.Exists(testfile, rpc.Watch{ShouldWatch: true, Callback: func(_ rpc.WatchArgs) {
+				ch_create <- struct{}{}
+			}})
+			ck.Delete(testfile, 1)
+			<-ch_create
+			exists, _ = ck.Exists(testfile, rpc.Watch{ShouldWatch: false, Callback: rpc.EmptyWatch})
+			if exists {
+				ts.t.Fatalf("%s exists after watch signalling deletion", testfile)
+			}
+		} else if i % 3 == 1 { // GetData
+			testfile := dir + "/create"
+			ck.Create(testfile, "init", rpc.Flag{})
+			ch_newdata := make(chan string)
+			ck.GetData(testfile, rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
+				ch_newdata <- args.NewData
+			}})
+			randString := panapi.RandValue(15)
+			ck.SetData(testfile, randString, 1)
+			receieved := <-ch_newdata
+			if randString != receieved {
+				ts.t.Fatal("Got different data from watch than what was written")
+			}
+			data, _, _ := ck.GetData(testfile, rpc.Watch{ShouldWatch: false, Callback: rpc.EmptyWatch})
+			if data != randString {
+				ts.t.Fatal("Got different data from read than what was written")
+			}
+		} else { // GetChildren
+			testfile1 := dir + "/create"
+			testfile2 := dir + "/delete"
+			ck.Create(testfile2, "", rpc.Flag{})
+			ch_children := make(chan []rpc.Ppath)
+			ck.GetChildren(dir, rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
+				ch_children <- args.NewChildren
+			}})
+			ck.Create(testfile1, "", rpc.Flag{})
+			received := <-ch_children
+			if len(received) != 2 || received[0] != testfile1 || received[1] != testfile2 {
+				ts.t.Fatalf("Got %v from watch; should be [%s, %s]", received, testfile1, testfile2)
+			}
+			children, _ := ck.GetChildren(dir, rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
+				ch_children <- args.NewChildren
+			}})
+			if len(children) != 2 || children[0] != rpc.Ppath(testfile1.Suffix()) || children[1] != rpc.Ppath(testfile2.Suffix()) {
+				ts.t.Fatalf("Got %v from GetChildren; should be [create, delete]", children)
+			}
+			ck.Delete(testfile2, 1)
+			received = <- ch_children
+			if len(received) != 1 || received[0] != testfile1 {
+				ts.t.Fatalf("Got %v from watch; should be [create]", received)
+			}
+		}
+	}
+}
+
+// Create an ephemeral znode, and then crash. Watching client should see notif
+// Implicitly tests disconnecting client causes ephemeral znode to disappear
+func TestWatchEphermeral(t *testing.T) {
+	ts := MakeTest(t, "Test Watches on Ephemeral Znodes", 3, 5, true, false, false, false, -1, false)
+	tester.AnnotateTest("TestWatchEphemeral", 5)
+	defer ts.Cleanup()
+
+	created := make(chan struct{})
+	crash := make(chan struct{})
+	ck := ts.MakeSession()
+	go func() {
+		ck1 := ts.MakeSession()
+		ck1.Create("/a/b", "data", rpc.Flag{Ephemeral: true})
+		created <- struct{}{}
+		<-crash
+		ts.Crash(ck1)
+	}()
+
+	<-created // /a/b has been created
+	ch_watch := make(chan struct{})
+	exists, _ := ck.Exists("/a/b", rpc.Watch{
+		ShouldWatch: true,
+		Callback: func(_ rpc.WatchArgs) { ch_watch <- struct{}{} },
+	})
+	if !exists {
+		ts.t.Fatal("Expected /a/b to exist after creation")
+	}
+	crash <- struct{}{}
+	seen := false
+	now := time.Now()
+	for !seen || time.Since(now) < 1 * time.Second {
+		select {
+		case <-ch_watch:
+			seen = true
+			now = time.Now()
+		default:
+			exists, _ := ck.Exists("/a/b", rpc.Watch{ShouldWatch: false, Callback: func(_ rpc.WatchArgs) {}})
+			if exists && seen {
+				ts.t.Fatal("/a/b is visible after watch triggered")
+			}
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func TestWatchSequential(t *testing.T) {
+	ts := MakeTest(t, "Test Watches on sequential nodes", 3, 5, true, false, false, false, -1, false)
+	tester.AnnotateTest("TestWatchSequential", 5)
+	defer ts.Cleanup()
+
+	ck := ts.MakeSession()
+	ch_path := make(chan rpc.Ppath)
+	ck.Exists("/a/b-30", rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
+		path, _ := ck.Create("/a/b-", "", rpc.Flag{Sequential: true})
+		ch_path <- path
+	}})
+
+	ck2 := ts.MakeSession()
+	for range 50 {
+		ck2.Create("/a/b-", "", rpc.Flag{Sequential: true})
+	}
+	path := <-ch_path
+	children, _ := ck.GetChildren("/a", rpc.Watch{ShouldWatch: false, Callback: rpc.EmptyWatch})
+	if len(children) != 51 {
+		ts.t.Fatalf("Expected /a to have 51 children; got %d instead", len(children))
+	}
+	if !slices.Contains(children, rpc.Ppath(path.Suffix())) {
+		ts.t.Fatalf("/a does not have znode created by callback")
+	}
 }
