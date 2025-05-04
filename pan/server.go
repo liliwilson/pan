@@ -218,7 +218,7 @@ func (pn *PanServer) Snapshot() []byte {
 
 // Sets a new session timeout, given that we last heard from the client at the given timestamp.
 func newSessionTimeout(timestamp time.Time) time.Time {
-	timeout := 1 * time.Second
+	timeout := 5 * time.Second
 	return timestamp.Add(timeout)
 }
 
@@ -226,6 +226,13 @@ func newSessionTimeout(timestamp time.Time) time.Time {
 // Resets the session timeout if the session is live.
 func (pn *PanServer) checkSession(sessionId int, timestamp time.Time) bool {
 	timeout, ok := pn.sessions[sessionId]
+
+	for session, timeout := range pn.sessions {
+		if session != sessionId && timestamp.After(timeout) {
+			pn.cleanupSession(session)
+		}
+	}
+
 	if !ok || timestamp.After(timeout) {
 		pn.cleanupSession(sessionId)
 		return false
@@ -270,7 +277,6 @@ func (pn *PanServer) applyStartSession(args *rpc.StartSessionArgs, reply *rpc.St
 	sessionId := pn.sessionCounter
 	pn.sessionCounter++
 	pn.sessions[sessionId] = newSessionTimeout(timestamp)
-	// fmt.Printf("started session w id %v, sessions %v\n", sessionId, pn.sessions)
 
 	reply.Err = rpc.OK
 	reply.SessionId = sessionId
@@ -448,8 +454,6 @@ func (pn *PanServer) applyGetChildren(args *rpc.GetChildrenArgs, reply *rpc.GetC
 		return
 	}
 
-	fmt.Printf("TIME: %v, sessions %+v, eph %+v\n\n", timestamp, pn.sessions, pn.ephemeralNodes)
-
 	path := args.Path.ParsePath()
 	zn := pn.rootZNode.lookup(path)
 
@@ -586,7 +590,7 @@ func StartPanServer(servers []*labrpc.ClientEnd, gid tester.Tgid, me int, persis
 	pn := &PanServer{me: me, peers: servers, rootZNode: &ZNode{name: ""}, sessions: make(map[int]time.Time), ephemeralNodes: make(map[int][]rpc.Ppath)}
 	pn.rsm = rsm.MakeRSM(servers, me, persister, maxraftstate, pn)
 
-	go pn.monitorSessions()
+	// go pn.monitorSessions()
 
 	return []tester.IService{pn, pn.rsm.Raft()}
 }
