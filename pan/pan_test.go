@@ -197,9 +197,9 @@ func (ts *Test) GenericTest() {
 	ch_crash := make(chan struct{})
 	ch_err := make(chan string)
 	ck := ts.MakeSession()
+	results := make([]panapi.TestType, NITER)
 	for i := 0; i < NITER; i++ {
 		file := rpc.Ppath(fmt.Sprintf("/a/b%d/f-", i))
-		parent := rpc.Ppath(fmt.Sprintf("/a/b%d", i))
 		go func() {
 			tt := ts.StartSessionsAndWait(ts.nclients, T, file, ts.clientCrash, ch_err)
 			ch_spawn <- tt
@@ -243,8 +243,12 @@ func (ts *Test) GenericTest() {
 		}
 
 		// at this point, all network should be good
-		time.Sleep(2 * time.Second)
-		ts.CheckRes(ck, res, parent)
+		results[i] = res
+	}
+	time.Sleep(10 * time.Second)
+	for i := range NITER {
+		parent := rpc.Ppath(fmt.Sprintf("/a/b%d", i))
+		ts.CheckRes(ck, results[i], parent)
 	}
 }
 

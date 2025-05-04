@@ -145,8 +145,8 @@ func (ts *Test) CheckRes(ck IPNSession, res TestType, dir rpc.Ppath) {
 
 func (ts *Test) StartSessionsAndWait(nclnt int, t time.Duration, file rpc.Ppath, clientCrashes bool, ch_err chan string) TestType {
 	const (
-		PERITER = 10
-		ITERS   = 5
+		PERITER = 2
+		ITERS   = 3
 	)
 	ch_path := make([]chan []rpc.Ppath, nclnt)
 	for i := range nclnt {

@@ -36,16 +36,32 @@ const (
 	ErrWrongGroup  = "ErrWrongGroup"
 )
 
-type SessionArgs struct {
-	SessionId string
+type StartSessionArgs struct {
 }
 
-type SessionReply struct {
+type StartSessionReply struct {
+	SessionId int
+	Err       Err
+}
+
+type EndSessionArgs struct {
+	SessionId int
+}
+
+type EndSessionReply struct {
+	Err Err
+}
+
+type KeepAliveArgs struct {
+	SessionId int
+}
+
+type KeepAliveReply struct {
 	Err Err
 }
 
 type CreateArgs struct {
-	SessionId string
+	SessionId int
 	Path      Ppath
 	Data      string
 	Flags     Flag
@@ -57,7 +73,7 @@ type CreateReply struct {
 }
 
 type ExistsArgs struct {
-	SessionId string
+	SessionId int
 	Path      Ppath
 	Watch     Watch
 }
@@ -68,7 +84,7 @@ type ExistsReply struct {
 }
 
 type GetDataArgs struct {
-	SessionId string
+	SessionId int
 	Path      Ppath
 	Watch     Watch
 }
@@ -80,7 +96,7 @@ type GetDataReply struct {
 }
 
 type SetDataArgs struct {
-	SessionId string
+	SessionId int
 	Path      Ppath
 	Data      string
 	Version   Pversion
@@ -91,7 +107,7 @@ type SetDataReply struct {
 }
 
 type GetChildrenArgs struct {
-	SessionId string
+	SessionId int
 	Path      Ppath
 	Watch     Watch
 }
@@ -102,7 +118,7 @@ type GetChildrenReply struct {
 }
 
 type DeleteArgs struct {
-	SessionId string
+	SessionId int
 	Path      Ppath
 	Version   Pversion
 }
