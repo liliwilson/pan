@@ -43,7 +43,7 @@ func TestBasic(t *testing.T) {
 		ts.t.Fatalf("/a should exist\n")
 	}
 
-	exists, _ = ck.Exists("/a/b", rpc.Watch{ShouldWatch:false, Callback: func(wa rpc.WatchArgs) {}})
+	exists, _ = ck.Exists("/a/b", rpc.Watch{ShouldWatch: false, Callback: func(wa rpc.WatchArgs) {}})
 	if !exists {
 		ts.t.Fatalf("/a/b should exist\n")
 	}
@@ -105,7 +105,7 @@ func TestManyClientSequential(t *testing.T) {
 		go func(idx int) {
 			start := time.Now()
 			count := 0
-			for time.Since(start) < 5 * time.Millisecond {
+			for time.Since(start) < 5*time.Millisecond {
 				cks[i].Create("/a/seq-", "data", rpc.Flag{Sequential: true})
 				count += 1
 			}
@@ -162,7 +162,7 @@ func TestSequentialMonotonicallyIncreases(t *testing.T) {
 		go func(idx int) {
 			start := time.Now()
 			count := 0
-			for time.Since(start) < 5 * time.Millisecond {
+			for time.Since(start) < 5*time.Millisecond {
 				cks[i].Create(path, "data", rpc.Flag{Sequential: true, Ephemeral: true})
 				count += 1
 			}
@@ -306,11 +306,13 @@ func TestWatch(t *testing.T) {
 	defer ts.Cleanup()
 
 	ck := ts.MakeSession()
-	const (NITERS = 60)
+	const (
+		NITERS = 60
+	)
 	for i := range NITERS {
 		dir := rpc.Ppath(fmt.Sprintf("/a/b%d", i))
 		ck.Create(dir, "init", rpc.Flag{})
-		if i % 3 == 0 { // Exists
+		if i%3 == 0 { // Exists
 			testfile := dir + "/create"
 			ch_create := make(chan rpc.WatchArgs)
 			ck.Exists(testfile, rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
@@ -341,7 +343,7 @@ func TestWatch(t *testing.T) {
 			if exists {
 				ts.t.Fatalf("%s exists after watch signalling deletion", testfile)
 			}
-		} else if i % 3 == 1 { // GetData
+		} else if i%3 == 1 { // GetData
 			testfile := dir + "/create"
 			ck.Create(testfile, "init", rpc.Flag{})
 			ch_newdata := make(chan rpc.WatchArgs)
@@ -414,7 +416,7 @@ func TestWatchEphermeral(t *testing.T) {
 	ch_watch := make(chan struct{})
 	exists, _ := ck.Exists("/a/b", rpc.Watch{
 		ShouldWatch: true,
-		Callback: func(_ rpc.WatchArgs) { ch_watch <- struct{}{} },
+		Callback:    func(_ rpc.WatchArgs) { ch_watch <- struct{}{} },
 	})
 	if !exists {
 		ts.t.Fatal("Expected /a/b to exist after creation")
@@ -422,7 +424,7 @@ func TestWatchEphermeral(t *testing.T) {
 	crash <- struct{}{}
 	seen := false
 	now := time.Now()
-	for !seen || time.Since(now) < 1 * time.Second {
+	for !seen || time.Since(now) < 1*time.Second {
 		select {
 		case <-ch_watch:
 			seen = true
