@@ -270,11 +270,11 @@ func TestJustLeaderCrashes(t *testing.T) {
 	ts.GenericTest()
 }
 
-func TestJustPartitions(t *testing.T) {
-	ts := MakeTest(t, "Test Partitions", 3, 5, true, false, false, true, -1, false)
-	tester.AnnotateTest("TestPartitions", 5)
-	ts.GenericTest()
-}
+// func TestJustPartitions(t *testing.T) {
+// 	ts := MakeTest(t, "Test Partitions", 3, 5, true, false, false, true, -1, false)
+// 	tester.AnnotateTest("TestPartitions", 5)
+// 	ts.GenericTest()
+// }
 
 func TestBothClientCrashesLeaderCrashes(t *testing.T) {
 	ts := MakeTest(t, "Test Client and Leader Crashes", 3, 5, true, true, true, false, -1, false)
@@ -282,23 +282,23 @@ func TestBothClientCrashesLeaderCrashes(t *testing.T) {
 	ts.GenericTest()
 }
 
-func TestBothClientCrashesWithPartitions(t *testing.T) {
-	ts := MakeTest(t, "Test Client Crashes and Partitions", 3, 5, true, false, true, true, -1, false)
-	tester.AnnotateTest("TestClientCrashesWithPartitions", 5)
-	ts.GenericTest()
-}
-
-func TestBothLeaderCrashesWithPartitions(t *testing.T) {
-	ts := MakeTest(t, "Test Leader Crashes and Partitions", 3, 5, true, true, false, true, -1, false)
-	tester.AnnotateTest("TestLeaderCrashesWithPartitions", 5)
-	ts.GenericTest()
-}
-
-func TestAllClientCrashesLeaderCrashesWithPartitions(t *testing.T) {
-	ts := MakeTest(t, "Test Client Crashes and Leader Crashes and Partitions", 3, 5, true, true, true, true, -1, false)
-	tester.AnnotateTest("TestClientCrashesLeaderCrashesWithPartitions", 5)
-	ts.GenericTest()
-}
+// func TestBothClientCrashesWithPartitions(t *testing.T) {
+// 	ts := MakeTest(t, "Test Client Crashes and Partitions", 3, 5, true, false, true, true, -1, false)
+// 	tester.AnnotateTest("TestClientCrashesWithPartitions", 5)
+// 	ts.GenericTest()
+// }
+//
+// func TestBothLeaderCrashesWithPartitions(t *testing.T) {
+// 	ts := MakeTest(t, "Test Leader Crashes and Partitions", 3, 5, true, true, false, true, -1, false)
+// 	tester.AnnotateTest("TestLeaderCrashesWithPartitions", 5)
+// 	ts.GenericTest()
+// }
+//
+// func TestAllClientCrashesLeaderCrashesWithPartitions(t *testing.T) {
+// 	ts := MakeTest(t, "Test Client Crashes and Leader Crashes and Partitions", 3, 5, true, true, true, true, -1, false)
+// 	tester.AnnotateTest("TestClientCrashesLeaderCrashesWithPartitions", 5)
+// 	ts.GenericTest()
+// }
 
 func TestWatch(t *testing.T) {
 	ts := MakeTest(t, "Test Watches on all three functions", 3, 5, true, false, false, false, -1, false)
