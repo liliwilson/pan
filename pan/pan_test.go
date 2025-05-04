@@ -258,43 +258,43 @@ func TestNoErrors(t *testing.T) {
 	ts.GenericTest()
 }
 
-func TestClientCrashes(t *testing.T) {
+func TestJustClientCrashes(t *testing.T) {
 	ts := MakeTest(t, "Test Client Crashes", 3, 5, true, false, true, false, -1, false)
 	tester.AnnotateTest("TestClientCrashes", 5)
 	ts.GenericTest()
 }
 
-func TestLeaderCrashes(t *testing.T) {
+func TestJustLeaderCrashes(t *testing.T) {
 	ts := MakeTest(t, "Test Leader Crashes", 3, 5, true, true, false, false, -1, false)
 	tester.AnnotateTest("TestLeaderCrashes", 5)
 	ts.GenericTest()
 }
 
-func TestPartitions(t *testing.T) {
+func TestJustPartitions(t *testing.T) {
 	ts := MakeTest(t, "Test Partitions", 3, 5, true, false, false, true, -1, false)
 	tester.AnnotateTest("TestPartitions", 5)
 	ts.GenericTest()
 }
 
-func TestClientCrashesLeaderCrashes(t *testing.T) {
+func TestBothClientCrashesLeaderCrashes(t *testing.T) {
 	ts := MakeTest(t, "Test Client and Leader Crashes", 3, 5, true, true, true, false, -1, false)
 	tester.AnnotateTest("TestClientCrashesLeaderCrashes", 5)
 	ts.GenericTest()
 }
 
-func TestClientCrashesWithPartitions(t *testing.T) {
+func TestBothClientCrashesWithPartitions(t *testing.T) {
 	ts := MakeTest(t, "Test Client Crashes and Partitions", 3, 5, true, false, true, true, -1, false)
 	tester.AnnotateTest("TestClientCrashesWithPartitions", 5)
 	ts.GenericTest()
 }
 
-func TestLeaderCrashesWithPartitions(t *testing.T) {
+func TestBothLeaderCrashesWithPartitions(t *testing.T) {
 	ts := MakeTest(t, "Test Leader Crashes and Partitions", 3, 5, true, true, false, true, -1, false)
 	tester.AnnotateTest("TestLeaderCrashesWithPartitions", 5)
 	ts.GenericTest()
 }
 
-func TestClientCrashesLeaderCrashesWithPartitions(t *testing.T) {
+func TestAllClientCrashesLeaderCrashesWithPartitions(t *testing.T) {
 	ts := MakeTest(t, "Test Client Crashes and Leader Crashes and Partitions", 3, 5, true, true, true, true, -1, false)
 	tester.AnnotateTest("TestClientCrashesLeaderCrashesWithPartitions", 5)
 	ts.GenericTest()
