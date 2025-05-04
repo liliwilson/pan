@@ -307,21 +307,31 @@ func TestWatch(t *testing.T) {
 		ck.Create(dir, "init", rpc.Flag{})
 		if i % 3 == 0 { // Exists
 			testfile := dir + "/create"
-			ch_create := make(chan struct{})
-			ck.Exists(testfile, rpc.Watch{ShouldWatch: true, Callback: func(_ rpc.WatchArgs) {
-				ch_create <- struct{}{}
+			ch_create := make(chan rpc.WatchArgs)
+			ck.Exists(testfile, rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
+				ch_create <- args
 			}})
 			ck.Create(testfile, "start", rpc.Flag{})
-			<-ch_create
+			received := <-ch_create
+			if received.EventType != rpc.NodeCreated {
+				ts.t.Fatalf("Expected rpc.NodeCreated as the event type; got %s", received.EventType)
+			} else if received.Path != testfile {
+				ts.t.Fatalf("Expected %s as the Path; got %s", testfile, received.Path)
+			}
 			exists, _ := ck.Exists(testfile, rpc.Watch{ShouldWatch: false, Callback: rpc.EmptyWatch})
 			if !exists {
 				ts.t.Fatalf("%s does not exist after watch signalling creation", testfile)
 			}
-			ck.Exists(testfile, rpc.Watch{ShouldWatch: true, Callback: func(_ rpc.WatchArgs) {
-				ch_create <- struct{}{}
+			ck.Exists(testfile, rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
+				ch_create <- args
 			}})
 			ck.Delete(testfile, 1)
-			<-ch_create
+			received = <-ch_create
+			if received.EventType != rpc.NodeDeleted {
+				ts.t.Fatalf("Expected rpc.NodeDeleted as the event type; got %s", received.EventType)
+			} else if received.Path != testfile {
+				ts.t.Fatalf("Expected %s as the Path; got %s", testfile, received.Path)
+			}
 			exists, _ = ck.Exists(testfile, rpc.Watch{ShouldWatch: false, Callback: rpc.EmptyWatch})
 			if exists {
 				ts.t.Fatalf("%s exists after watch signalling deletion", testfile)
@@ -329,15 +339,17 @@ func TestWatch(t *testing.T) {
 		} else if i % 3 == 1 { // GetData
 			testfile := dir + "/create"
 			ck.Create(testfile, "init", rpc.Flag{})
-			ch_newdata := make(chan string)
+			ch_newdata := make(chan rpc.WatchArgs)
 			ck.GetData(testfile, rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
-				ch_newdata <- args.NewData
+				ch_newdata <- args
 			}})
 			randString := panapi.RandValue(15)
 			ck.SetData(testfile, randString, 1)
-			receieved := <-ch_newdata
-			if randString != receieved {
-				ts.t.Fatal("Got different data from watch than what was written")
+			received := <-ch_newdata
+			if received.EventType != rpc.NodeDataChanged {
+				ts.t.Fatalf("Expected rpc.NodeDataChanged as the event type; got %s", received.EventType)
+			} else if received.Path != testfile {
+				ts.t.Fatalf("Expected %s as the Path; got %s", testfile, received.Path)
 			}
 			data, _, _ := ck.GetData(testfile, rpc.Watch{ShouldWatch: false, Callback: rpc.EmptyWatch})
 			if data != randString {
@@ -347,25 +359,29 @@ func TestWatch(t *testing.T) {
 			testfile1 := dir + "/create"
 			testfile2 := dir + "/delete"
 			ck.Create(testfile2, "", rpc.Flag{})
-			ch_children := make(chan []rpc.Ppath)
+			ch_children := make(chan rpc.WatchArgs)
 			ck.GetChildren(dir, rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
-				ch_children <- args.NewChildren
+				ch_children <- args
 			}})
 			ck.Create(testfile1, "", rpc.Flag{})
 			received := <-ch_children
-			if len(received) != 2 || received[0] != testfile1 || received[1] != testfile2 {
-				ts.t.Fatalf("Got %v from watch; should be [%s, %s]", received, testfile1, testfile2)
+			if received.EventType != rpc.NodeChildrenChanged {
+				ts.t.Fatalf("Expected rpc.NodeChildrenChanged as the event type; got %s", received.EventType)
+			} else if received.Path != dir {
+				ts.t.Fatalf("Expected %s as the Path; got %s", dir, received.Path)
 			}
-			children, _ := ck.GetChildren(dir, rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
-				ch_children <- args.NewChildren
+			children, _ := ck.GetChildren(dir, rpc.Watch{ShouldWatch: false})
+			if len(children) != 2 || children[0] != rpc.Ppath(testfile1.Suffix()) || children[1] != rpc.Ppath(testfile1.Suffix()) {
+				ts.t.Fatalf("Got %v from GetChildren; should be [%s, %s]", children, testfile1, testfile2)
+			}
+			ck.GetChildren(dir, rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
+				ch_children <- args
 			}})
-			if len(children) != 2 || children[0] != rpc.Ppath(testfile1.Suffix()) || children[1] != rpc.Ppath(testfile2.Suffix()) {
-				ts.t.Fatalf("Got %v from GetChildren; should be [create, delete]", children)
-			}
 			ck.Delete(testfile2, 1)
-			received = <- ch_children
-			if len(received) != 1 || received[0] != testfile1 {
-				ts.t.Fatalf("Got %v from watch; should be [create]", received)
+			received = <-ch_children
+			children, _ = ck.GetChildren(dir, rpc.Watch{ShouldWatch: false})
+			if len(children) != 1 || children[0] != rpc.Ppath(testfile1.Suffix()) {
+				ts.t.Fatalf("Got %v from watch; should be [create]", children)
 			}
 		}
 	}
@@ -423,7 +439,7 @@ func TestWatchSequential(t *testing.T) {
 
 	ck := ts.MakeSession()
 	ch_path := make(chan rpc.Ppath)
-	ck.Exists("/a/b-30", rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
+	ck.Exists("/a/b-30", rpc.Watch{ShouldWatch: true, Callback: func(_ rpc.WatchArgs) {
 		path, _ := ck.Create("/a/b-", "", rpc.Flag{Sequential: true})
 		ch_path <- path
 	}})

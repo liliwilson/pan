@@ -18,26 +18,6 @@ func (path *Ppath) Suffix() string {
 	return dirs[len(dirs) - 1]
 }
 
-type Watch struct {
-	ShouldWatch bool
-	Callback    func(WatchArgs)
-}
-
-type WatchArgs struct {
-	IsGetData bool
-	NewData   string
-
-	IsExists bool
-
-	IsGetChildren bool
-	NewChildren   []Ppath
-
-	// Should be set for all three events
-	ZNodeExists bool
-}
-
-func EmptyWatch(_ WatchArgs) {}
-
 type Err string
 
 const (
