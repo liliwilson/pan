@@ -127,7 +127,7 @@ type TestType struct {
 }
 
 func (ts *Test) CheckRes(ck IPNSession, res TestType, dir rpc.Ppath) {
-	children, _ := ck.GetChildren(dir, rpc.Watch{ShouldWatch: false, Callback: func(){}})
+	children, _ := ck.GetChildren(dir, rpc.Watch{ShouldWatch: false, Callback: func(wa rpc.WatchArgs){}})
 	if len(children) != len(res.Remaining) {
 		ts.t.Fatalf("Number of children: %d, number of remaining ephemeral znodes: %d\n", len(children), len(res.Remaining))
 	}

@@ -13,9 +13,9 @@ func (path *Ppath) ParsePath() []string {
 	return strings.Split(string(*path), "/")
 }
 
-type Watch struct {
-	ShouldWatch bool
-	Callback    func()
+func (path *Ppath) Suffix() string {
+	dirs := path.ParsePath()
+	return dirs[len(dirs) - 1]
 }
 
 type Err string
