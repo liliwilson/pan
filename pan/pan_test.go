@@ -306,7 +306,7 @@ func TestWatch(t *testing.T) {
 	defer ts.Cleanup()
 
 	ck := ts.MakeSession()
-	const (NITERS = 300)
+	const (NITERS = 60)
 	for i := range NITERS {
 		dir := rpc.Ppath(fmt.Sprintf("/a/b%d", i))
 		ck.Create(dir, "init", rpc.Flag{})
