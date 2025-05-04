@@ -3,7 +3,7 @@ package pan
 import (
 	// "fmt"
 
-	"fmt"
+	// "fmt"
 	"pan/panapi"
 	"pan/panapi/rpc"
 	"sync"
@@ -49,7 +49,7 @@ func (ck *Session) Create(path rpc.Ppath, data string, flags rpc.Flag) (rpc.Ppat
 		leader := ck.getLeader()
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.Create", &args, &reply)
 		if ok && reply.Err != rpc.ErrWrongLeader {
-			fmt.Printf("client with session id %d created %v, with error %v\n", ck.id, reply.ZNodeName, reply.Err)
+			// fmt.Printf("client with session id %d created %v, with error %v\n", ck.id, reply.ZNodeName, reply.Err)
 			return reply.ZNodeName, reply.Err
 		}
 		ck.incrementLeader()
