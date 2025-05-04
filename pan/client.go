@@ -166,11 +166,12 @@ func (ck *Session) maintainSession() {
 	for {
 		time.Sleep(ck.keepAliveInterval)
 		leader := ck.getLeader()
-		ck.clnt.Call(ck.servers[leader], "PanServer.KeepAlive", &args, &reply)
+		ok := ck.clnt.Call(ck.servers[leader], "PanServer.KeepAlive", &args, &reply)
 		if reply.Err == rpc.ErrSessionClosed {
 			break
 		}
-		if reply.Err == rpc.ErrWrongLeader {
+
+		if !ok || reply.Err == rpc.ErrWrongLeader {
 			ck.incrementLeader()
 		}
 	}
