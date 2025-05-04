@@ -2,6 +2,7 @@ package pan
 
 import (
 	// "fmt"
+	"fmt"
 	"pan/panapi/rpc"
 	"sort"
 	"strconv"
@@ -14,7 +15,6 @@ import (
 	"6.5840/labgob"
 	"6.5840/labrpc"
 	tester "6.5840/tester1"
-	"github.com/google/uuid"
 )
 
 type ZNode struct {
@@ -139,10 +139,11 @@ type PanServer struct {
 	// ZK data structures
 	mu             sync.Mutex
 	rootZNode      *ZNode
-	sessions       map[string]time.Time   // map session ID to timeout
+	sessions       map[int]time.Time      // map session ID to timeout
 	dataWatches    map[rpc.Ppath][]*Watch // map path to list of data watches on that path
 	childWatches   map[rpc.Ppath][]*Watch // map path to list of child watches on that path
-	ephemeralNodes map[string][]rpc.Ppath // map session IDs to list of ephemeral znode paths
+	ephemeralNodes map[int][]rpc.Ppath    // map session IDs to list of ephemeral znode paths
+	sessionCounter int
 }
 
 type TimestampedRequest struct {
@@ -217,13 +218,13 @@ func (pn *PanServer) Snapshot() []byte {
 
 // Sets a new session timeout, given that we last heard from the client at the given timestamp.
 func newSessionTimeout(timestamp time.Time) time.Time {
-	timeout := 5 * time.Second
+	timeout := 1 * time.Second
 	return timestamp.Add(timeout)
 }
 
 // Given a session id, returns true iff the session is still live.
 // Resets the session timeout if the session is live.
-func (pn *PanServer) checkSession(sessionId string, timestamp time.Time) bool {
+func (pn *PanServer) checkSession(sessionId int, timestamp time.Time) bool {
 	timeout, ok := pn.sessions[sessionId]
 	if !ok || timestamp.After(timeout) {
 		pn.cleanupSession(sessionId)
@@ -236,7 +237,7 @@ func (pn *PanServer) checkSession(sessionId string, timestamp time.Time) bool {
 
 // Cleans up a session that has ended, removing it from session list
 // and deleting ephemeral nodes.
-func (pn *PanServer) cleanupSession(sessionId string) {
+func (pn *PanServer) cleanupSession(sessionId int) {
 	ephemeralNodes := pn.ephemeralNodes[sessionId]
 	for _, path := range ephemeralNodes {
 		path := path.ParsePath()
@@ -266,8 +267,10 @@ func (pn *PanServer) applyStartSession(args *rpc.StartSessionArgs, reply *rpc.St
 	pn.mu.Lock()
 	defer pn.mu.Unlock()
 
-	sessionId := uuid.New().String()
+	sessionId := pn.sessionCounter
+	pn.sessionCounter++
 	pn.sessions[sessionId] = newSessionTimeout(timestamp)
+	// fmt.Printf("started session w id %v, sessions %v\n", sessionId, pn.sessions)
 
 	reply.Err = rpc.OK
 	reply.SessionId = sessionId
@@ -290,6 +293,7 @@ func (pn *PanServer) applyCreate(args *rpc.CreateArgs, reply *rpc.CreateReply, t
 	defer pn.mu.Unlock()
 
 	if !pn.checkSession(args.SessionId, timestamp) {
+		fmt.Printf("failed with timestamp %v and sessionId %v, given sessions %v\n", timestamp, args.SessionId, pn.sessions)
 		reply.Err = rpc.ErrSessionClosed
 		return
 	}
@@ -444,6 +448,8 @@ func (pn *PanServer) applyGetChildren(args *rpc.GetChildrenArgs, reply *rpc.GetC
 		return
 	}
 
+	fmt.Printf("TIME: %v, sessions %+v, eph %+v\n\n", timestamp, pn.sessions, pn.ephemeralNodes)
+
 	path := args.Path.ParsePath()
 	zn := pn.rootZNode.lookup(path)
 
@@ -452,6 +458,7 @@ func (pn *PanServer) applyGetChildren(args *rpc.GetChildrenArgs, reply *rpc.GetC
 		for i, child := range zn.children {
 			childrenPaths[i] = rpc.Ppath(child.name)
 		}
+
 		reply.Children = childrenPaths
 		reply.Err = rpc.OK
 	} else {
@@ -576,7 +583,7 @@ func StartPanServer(servers []*labrpc.ClientEnd, gid tester.Tgid, me int, persis
 	labgob.Register(rpc.DeleteArgs{})
 	labgob.Register(TimestampedRequest{})
 
-	pn := &PanServer{me: me, peers: servers, rootZNode: &ZNode{name: ""}, sessions: make(map[string]time.Time), ephemeralNodes: make(map[string][]rpc.Ppath)}
+	pn := &PanServer{me: me, peers: servers, rootZNode: &ZNode{name: ""}, sessions: make(map[int]time.Time), ephemeralNodes: make(map[int][]rpc.Ppath)}
 	pn.rsm = rsm.MakeRSM(servers, me, persister, maxraftstate, pn)
 
 	go pn.monitorSessions()

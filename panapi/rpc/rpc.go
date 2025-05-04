@@ -40,12 +40,12 @@ type StartSessionArgs struct {
 }
 
 type StartSessionReply struct {
-	SessionId string
+	SessionId int
 	Err       Err
 }
 
 type EndSessionArgs struct {
-	SessionId string
+	SessionId int
 }
 
 type EndSessionReply struct {
@@ -53,7 +53,7 @@ type EndSessionReply struct {
 }
 
 type KeepAliveArgs struct {
-	SessionId string
+	SessionId int
 }
 
 type KeepAliveReply struct {
@@ -61,7 +61,7 @@ type KeepAliveReply struct {
 }
 
 type CreateArgs struct {
-	SessionId string
+	SessionId int
 	Path      Ppath
 	Data      string
 	Flags     Flag
@@ -73,7 +73,7 @@ type CreateReply struct {
 }
 
 type ExistsArgs struct {
-	SessionId string
+	SessionId int
 	Path      Ppath
 	Watch     Watch
 }
@@ -84,7 +84,7 @@ type ExistsReply struct {
 }
 
 type GetDataArgs struct {
-	SessionId string
+	SessionId int
 	Path      Ppath
 	Watch     Watch
 }
@@ -96,7 +96,7 @@ type GetDataReply struct {
 }
 
 type SetDataArgs struct {
-	SessionId string
+	SessionId int
 	Path      Ppath
 	Data      string
 	Version   Pversion
@@ -107,7 +107,7 @@ type SetDataReply struct {
 }
 
 type GetChildrenArgs struct {
-	SessionId string
+	SessionId int
 	Path      Ppath
 	Watch     Watch
 }
@@ -118,7 +118,7 @@ type GetChildrenReply struct {
 }
 
 type DeleteArgs struct {
-	SessionId string
+	SessionId int
 	Path      Ppath
 	Version   Pversion
 }

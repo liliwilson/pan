@@ -242,6 +242,7 @@ func (ts *Test) GenericTest() {
 		}
 
 		// at this point, all network should be good
+		time.Sleep(2 * time.Second)
 		ts.CheckRes(ck, res, parent)
 	}
 }
