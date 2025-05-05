@@ -15,7 +15,7 @@ func (path *Ppath) ParsePath() []string {
 
 func (path *Ppath) Suffix() string {
 	dirs := path.ParsePath()
-	return dirs[len(dirs) - 1]
+	return dirs[len(dirs)-1]
 }
 
 type Err string
@@ -69,6 +69,7 @@ type CreateArgs struct {
 
 type CreateReply struct {
 	ZNodeName Ppath
+	CreatedBy int // the session ID of the creator of this znode
 	Err       Err
 }
 
@@ -125,4 +126,14 @@ type DeleteArgs struct {
 
 type DeleteReply struct {
 	Err Err
+}
+
+type GetHighestSeqArgs struct {
+	SessionId int
+	Path      Ppath
+}
+
+type GetHighestSeqReply struct {
+	SeqNum int
+	Err    Err
 }

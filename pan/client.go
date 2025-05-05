@@ -4,8 +4,10 @@ import (
 	// "fmt"
 
 	// "fmt"
+	"fmt"
 	"pan/panapi"
 	"pan/panapi/rpc"
+	"strconv"
 	"sync"
 	"time"
 
@@ -43,14 +45,52 @@ func (ck *Session) incrementLeader() int {
 // Create a new znode with flags; return the name of the new znode
 func (ck *Session) Create(path rpc.Ppath, data string, flags rpc.Flag) (rpc.Ppath, rpc.Err) {
 	args := rpc.CreateArgs{SessionId: ck.id, Path: path, Data: data, Flags: flags}
-	reply := rpc.CreateReply{}
+
+	var oldSeqNum int
+	if flags.Sequential {
+		oldSeqNum, _ = ck.getHighestSequence(path)
+	}
 
 	for {
+		reply := rpc.CreateReply{}
 		leader := ck.getLeader()
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.Create", &args, &reply)
 		if ok && reply.Err != rpc.ErrWrongLeader {
+			// If the znode already exists, but we created it, return OK. This may come up in crash cases.
+			if reply.Err == rpc.ErrOnCreate && reply.CreatedBy == ck.id {
+				return reply.ZNodeName, rpc.OK
+			}
+
 			// fmt.Printf("client with session id %d created %v, with error %v\n", ck.id, reply.ZNodeName, reply.Err)
 			return reply.ZNodeName, reply.Err
+		}
+
+		// If we did not get a response, figure out if our znode was actually created.
+		// If it was, return. Otherwise, retry.
+		if !ok {
+			if flags.Sequential {
+				newSeqNum, _ := ck.getHighestSequence(path)
+				if newSeqNum > oldSeqNum {
+					updatedPath := path + rpc.Ppath(strconv.Itoa(newSeqNum))
+					return updatedPath, reply.Err
+				}
+			}
+		}
+
+		ck.incrementLeader()
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
+func (ck *Session) getHighestSequence(path rpc.Ppath) (int, rpc.Err) {
+	args := rpc.GetHighestSeqArgs{SessionId: ck.id, Path: path}
+
+	for {
+		reply := rpc.GetHighestSeqReply{}
+		leader := ck.getLeader()
+		ok := ck.clnt.Call(ck.servers[leader], "PanServer.GetHighestSequence", &args, &reply)
+		if ok && reply.Err != rpc.ErrWrongLeader {
+			return reply.SeqNum, reply.Err
 		}
 		ck.incrementLeader()
 		time.Sleep(100 * time.Millisecond)
@@ -60,9 +100,9 @@ func (ck *Session) Create(path rpc.Ppath, data string, flags rpc.Flag) (rpc.Ppat
 // Deletes the given znode if it is at the expected version
 func (ck *Session) Delete(path rpc.Ppath, version rpc.Pversion) rpc.Err {
 	args := rpc.DeleteArgs{SessionId: ck.id, Path: path, Version: version}
-	reply := rpc.DeleteReply{}
 
 	for {
+		reply := rpc.DeleteReply{}
 		leader := ck.getLeader()
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.Delete", &args, &reply)
 		if ok && reply.Err != rpc.ErrWrongLeader {
@@ -76,9 +116,9 @@ func (ck *Session) Delete(path rpc.Ppath, version rpc.Pversion) rpc.Err {
 // Returns true iff the znode at path exists
 func (ck *Session) Exists(path rpc.Ppath, watch rpc.Watch) (bool, rpc.Err) {
 	args := rpc.ExistsArgs{SessionId: ck.id, Path: path, Watch: watch}
-	reply := rpc.ExistsReply{}
 
 	for {
+		reply := rpc.ExistsReply{}
 		leader := ck.getLeader()
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.Exists", &args, &reply)
 		if ok && reply.Err != rpc.ErrWrongLeader {
@@ -92,9 +132,9 @@ func (ck *Session) Exists(path rpc.Ppath, watch rpc.Watch) (bool, rpc.Err) {
 // Returns the data and version information about znode
 func (ck *Session) GetData(path rpc.Ppath, watch rpc.Watch) (string, rpc.Pversion, rpc.Err) {
 	args := rpc.GetDataArgs{SessionId: ck.id, Path: path, Watch: watch}
-	reply := rpc.GetDataReply{}
 
 	for {
+		reply := rpc.GetDataReply{}
 		leader := ck.getLeader()
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.GetData", &args, &reply)
 		if ok && reply.Err != rpc.ErrWrongLeader {
@@ -110,10 +150,20 @@ func (ck *Session) SetData(path rpc.Ppath, data string, version rpc.Pversion) rp
 	args := rpc.SetDataArgs{SessionId: ck.id, Path: path, Data: data, Version: version}
 	reply := rpc.SetDataReply{}
 
+	leader := ck.getLeader()
+	ok := ck.clnt.Call(ck.servers[leader], "PanServer.SetData", &args, &reply)
+	if ok && reply.Err != rpc.ErrWrongLeader {
+		return reply.Err
+	}
+
 	for {
+		reply := rpc.SetDataReply{}
 		leader := ck.getLeader()
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.SetData", &args, &reply)
 		if ok && reply.Err != rpc.ErrWrongLeader {
+			if reply.Err == rpc.ErrVersion {
+				return rpc.ErrMaybe
+			}
 			return reply.Err
 		}
 		ck.incrementLeader()
@@ -124,9 +174,9 @@ func (ck *Session) SetData(path rpc.Ppath, data string, version rpc.Pversion) rp
 // Returns an alphabetically sorted list of child znodes
 func (ck *Session) GetChildren(path rpc.Ppath, watch rpc.Watch) ([]rpc.Ppath, rpc.Err) {
 	args := rpc.GetChildrenArgs{SessionId: ck.id, Path: path, Watch: watch}
-	reply := rpc.GetChildrenReply{}
 
 	for {
+		reply := rpc.GetChildrenReply{}
 		leader := ck.getLeader()
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.GetChildren", &args, &reply)
 		if ok && reply.Err != rpc.ErrWrongLeader {
@@ -145,9 +195,9 @@ func (ck *Session) Sync(path rpc.Ppath) rpc.Err {
 // End the current session
 func (ck *Session) EndSession() {
 	args := rpc.EndSessionArgs{SessionId: ck.id}
-	reply := rpc.EndSessionReply{}
 
 	for {
+		reply := rpc.EndSessionReply{}
 		leader := ck.getLeader()
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.EndSession", &args, &reply)
 		if ok && reply.Err != rpc.ErrWrongLeader {
@@ -161,9 +211,9 @@ func (ck *Session) EndSession() {
 // Private function to maintain the session with keepalive messages.
 func (ck *Session) maintainSession() {
 	args := rpc.KeepAliveArgs{SessionId: ck.id}
-	reply := rpc.KeepAliveReply{}
 
 	for {
+		reply := rpc.KeepAliveReply{}
 		time.Sleep(ck.keepAliveInterval)
 		leader := ck.getLeader()
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.KeepAlive", &args, &reply)
@@ -182,8 +232,8 @@ func MakeSession(clnt *tester.Clnt, servers []string) panapi.IPNSession {
 
 	// Notify the server of a new session
 	args := rpc.StartSessionArgs{}
-	reply := rpc.StartSessionReply{}
 	for {
+		reply := rpc.StartSessionReply{}
 		leader := ck.getLeader()
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.StartSession", &args, &reply)
 		if ok && reply.Err != rpc.ErrWrongLeader {

@@ -2,7 +2,6 @@ package pan
 
 import (
 	// "fmt"
-	"fmt"
 	"pan/panapi/rpc"
 	"sort"
 	"strconv"
@@ -17,25 +16,34 @@ import (
 	tester "6.5840/tester1"
 )
 
+type Key struct {
+	sessionId      int
+	sequencePrefix string
+}
+
 type ZNode struct {
 	name     string
 	data     string
 	version  rpc.Pversion
 	children []*ZNode
 
-	sequenceNums map[string]int
+	creatorId       int
+	sequenceNums    map[string]int
+	sessionToSeqNum map[Key]int
 }
 
 // Insert a node into a child's znode list at the correct spot.
 // Returns the new node object and a bool indicating success/failure of the operation.
 // Failure only occurs if a child with the given name already exists.
-func (zn *ZNode) addChild(name string, data string, sequential bool) (*ZNode, bool) {
+func (zn *ZNode) addChild(name string, data string, sequential bool, creatorId int) (*ZNode, bool) {
 	// If sequential, find the name
 	childName := name
 	if sequential {
 		seqNum := zn.sequenceNums[name]
 		childName += strconv.Itoa(seqNum)
 		zn.sequenceNums[name] = seqNum + 1
+
+		zn.sessionToSeqNum[Key{creatorId, name}] = seqNum
 	}
 
 	// Check if the child already exists, and if not, find where to insert it to maintain sorted order
@@ -44,7 +52,7 @@ func (zn *ZNode) addChild(name string, data string, sequential bool) (*ZNode, bo
 		return child, false
 	}
 
-	childZNode := ZNode{name: childName, data: data, version: 1, sequenceNums: make(map[string]int)}
+	childZNode := ZNode{name: childName, data: data, version: 1, creatorId: creatorId, sequenceNums: make(map[string]int), sessionToSeqNum: make(map[Key]int)}
 
 	zn.children = append(zn.children, &ZNode{})
 	copy(zn.children[idx+1:], zn.children[idx:])
@@ -152,7 +160,6 @@ type TimestampedRequest struct {
 }
 
 func (pn *PanServer) DoOp(tsReq any) any {
-	// fmt.Printf("S%d doing op %+v\n", pn.me, tsReq)
 	switch tsReq.(type) {
 	case TimestampedRequest:
 		tsReq := tsReq.(TimestampedRequest)
@@ -203,6 +210,11 @@ func (pn *PanServer) DoOp(tsReq any) any {
 			req := req.(rpc.DeleteArgs)
 			reply := rpc.DeleteReply{}
 			pn.applyDelete(&req, &reply, timestamp)
+			return &reply
+		case rpc.GetHighestSeqArgs:
+			req := req.(rpc.GetHighestSeqArgs)
+			reply := rpc.GetHighestSeqReply{}
+			pn.applyGetHighestSequence(&req, &reply, timestamp)
 			return &reply
 		}
 	}
@@ -258,6 +270,48 @@ func (pn *PanServer) cleanupSession(sessionId int) {
 	delete(pn.ephemeralNodes, sessionId)
 }
 
+func (pn *PanServer) GetHighestSequence(args *rpc.GetHighestSeqArgs, reply *rpc.GetHighestSeqReply) {
+	tsReq := TimestampedRequest{Timestamp: time.Now().UnixMicro(), Request: *args}
+	err, res := pn.rsm.Submit(tsReq)
+
+	if err == rpc.ErrWrongLeader {
+		reply.Err = rpc.ErrWrongLeader
+	} else {
+		*reply = *(res.(*rpc.GetHighestSeqReply))
+	}
+}
+
+func (pn *PanServer) applyGetHighestSequence(args *rpc.GetHighestSeqArgs, reply *rpc.GetHighestSeqReply, timestamp time.Time) {
+	pn.mu.Lock()
+	defer pn.mu.Unlock()
+
+	path := args.Path.ParsePath()
+
+	// You shouldn't be trying to create the root
+	if len(path) <= 1 {
+		reply.Err = rpc.ErrOnCreate
+		return
+	}
+
+	parentNode := pn.rootZNode.lookup(path[:len(path)-1])
+	if parentNode == nil {
+		reply.SeqNum = -1
+		reply.Err = rpc.ErrNoFile
+		return
+	}
+
+	name := path[len(path)-1]
+	seqNum, exists := parentNode.sessionToSeqNum[Key{args.SessionId, name}]
+	if !exists {
+		reply.SeqNum = -1
+		reply.Err = rpc.ErrNoFile
+		return
+	}
+
+	reply.SeqNum = seqNum
+	reply.Err = rpc.OK
+}
+
 // Start a session for a given client. Returns a session ID.
 func (pn *PanServer) StartSession(args *rpc.StartSessionArgs, reply *rpc.StartSessionReply) {
 	tsReq := TimestampedRequest{Timestamp: time.Now().UnixMicro(), Request: *args}
@@ -299,7 +353,6 @@ func (pn *PanServer) applyCreate(args *rpc.CreateArgs, reply *rpc.CreateReply, t
 	defer pn.mu.Unlock()
 
 	if !pn.checkSession(args.SessionId, timestamp) {
-		fmt.Printf("failed with timestamp %v and sessionId %v, given sessions %v\n", timestamp, args.SessionId, pn.sessions)
 		reply.Err = rpc.ErrSessionClosed
 		return
 	}
@@ -309,15 +362,16 @@ func (pn *PanServer) applyCreate(args *rpc.CreateArgs, reply *rpc.CreateReply, t
 	znode, idx := pn.rootZNode.lookupPrefix(path)
 
 	if idx == -1 {
+		reply.CreatedBy = znode.creatorId
 		reply.Err = rpc.ErrOnCreate
 	} else {
 		for ; idx < len(path); idx++ {
 			// ignore the success/failure flag from addChild because already existing child should have been caught by lookupPrefix
 			if idx == len(path)-1 {
-				znode, _ = znode.addChild(path[idx], args.Data, args.Flags.Sequential)
+				znode, _ = znode.addChild(path[idx], args.Data, args.Flags.Sequential, args.SessionId)
 				path[len(path)-1] = znode.name // update path with seq name
 			} else {
-				znode, _ = znode.addChild(path[idx], "", false)
+				znode, _ = znode.addChild(path[idx], "", false, args.SessionId)
 			}
 		}
 
@@ -328,6 +382,7 @@ func (pn *PanServer) applyCreate(args *rpc.CreateArgs, reply *rpc.CreateReply, t
 		}
 
 		reply.ZNodeName = createdPath
+		reply.CreatedBy = znode.creatorId
 		reply.Err = rpc.OK
 	}
 }
@@ -570,9 +625,10 @@ func StartPanServer(servers []*labrpc.ClientEnd, gid tester.Tgid, me int, persis
 	labgob.Register(rpc.SetDataArgs{})
 	labgob.Register(rpc.GetChildrenArgs{})
 	labgob.Register(rpc.DeleteArgs{})
+	labgob.Register(rpc.GetHighestSeqArgs{})
 	labgob.Register(TimestampedRequest{})
 
-	pn := &PanServer{me: me, peers: servers, rootZNode: &ZNode{name: ""}, sessions: make(map[int]time.Time), ephemeralNodes: make(map[int][]rpc.Ppath)}
+	pn := &PanServer{me: me, peers: servers, rootZNode: &ZNode{name: "", sequenceNums: make(map[string]int), sessionToSeqNum: make(map[Key]int)}, sessions: make(map[int]time.Time), ephemeralNodes: make(map[int][]rpc.Ppath)}
 	pn.rsm = rsm.MakeRSM(servers, me, persister, maxraftstate, pn)
 
 	return []tester.IService{pn, pn.rsm.Raft()}
