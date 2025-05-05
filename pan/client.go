@@ -3,8 +3,6 @@ package pan
 import (
 	// "fmt"
 
-	// "fmt"
-	"fmt"
 	"pan/panapi"
 	"pan/panapi/rpc"
 	"strconv"
