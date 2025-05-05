@@ -300,7 +300,7 @@ func TestBothClientCrashesLeaderCrashes(t *testing.T) {
 // 	ts.GenericTest()
 // }
 
-func TestWatch(t *testing.T) {
+func TestJustWatch(t *testing.T) {
 	ts := MakeTest(t, "Test Watches on all three functions", 3, 5, true, false, false, false, -1, false)
 	tester.AnnotateTest("TestWatchBasic", 5)
 	defer ts.Cleanup()
@@ -378,7 +378,7 @@ func TestWatch(t *testing.T) {
 				ts.t.Fatalf("Expected %s as the Path; got %s", dir, received.Path)
 			}
 			children, _ := ck.GetChildren(dir, rpc.Watch{ShouldWatch: false})
-			if len(children) != 2 || children[0] != rpc.Ppath(testfile1.Suffix()) || children[1] != rpc.Ppath(testfile1.Suffix()) {
+			if len(children) != 2 || children[0] != rpc.Ppath(testfile1.Suffix()) || children[1] != rpc.Ppath(testfile2.Suffix()) {
 				ts.t.Fatalf("Got %v from GetChildren; should be [%s, %s]", children, testfile1, testfile2)
 			}
 			ck.GetChildren(dir, rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {

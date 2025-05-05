@@ -80,8 +80,9 @@ type ExistsArgs struct {
 }
 
 type ExistsReply struct {
-	Result bool
-	Err    Err
+	Result  bool
+	WatchId int
+	Err     Err
 }
 
 type GetDataArgs struct {
@@ -93,6 +94,7 @@ type GetDataArgs struct {
 type GetDataReply struct {
 	Data    string
 	Version Pversion
+	WatchId int
 	Err     Err
 }
 
@@ -115,6 +117,7 @@ type GetChildrenArgs struct {
 
 type GetChildrenReply struct {
 	Children []Ppath
+	WatchId  int
 	Err      Err
 }
 
@@ -136,4 +139,14 @@ type GetHighestSeqArgs struct {
 type GetHighestSeqReply struct {
 	SeqNum int
 	Err    Err
+}
+
+type WatchWaitArgs struct {
+	SessionId int
+	WatchId   int
+}
+
+type WatchWaitReply struct {
+	WatchEvent WatchArgs
+	Err        Err
 }
