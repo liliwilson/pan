@@ -5,7 +5,6 @@ import (
 	"pan/panapi/rpc"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -143,7 +142,7 @@ type Watchlist struct {
 	watches   map[rpc.Ppath][]*Watch
 }
 
-// For a given watchlist, fire the watches that match the path
+// For a given watchlist, return a list of watches that should be fired based on the path
 func (watchlist *Watchlist) fire(path rpc.Ppath) map[Watch]*rpc.WatchArgs {
 	fired := make(map[Watch]*rpc.WatchArgs)
 
@@ -319,9 +318,17 @@ func (pn *PanServer) cleanupSession(sessionId int) {
 	ephemeralNodes := pn.ephemeralNodes[sessionId]
 	for _, path := range ephemeralNodes {
 		path := path.ParsePath()
-		parentNode := pn.rootZNode.lookup(path[:len(path)-1])
+
+		parentPath := path[:len(path)-1]
+		parentNode := pn.rootZNode.lookup(parentPath)
+
 		if parentNode != nil {
 			parentNode.removeChild(path[len(path)-1], 0, false)
+
+			// Fire child watches on the parent
+			pn.addFiredWatches(pn.childWatches.fire(rpc.MakePpath(parentPath)))
+			// Fire delete watches on the child
+			pn.addFiredWatches(pn.deleteWatches.fire(rpc.MakePpath(path)))
 		}
 	}
 
@@ -420,7 +427,7 @@ func (pn *PanServer) applyCreate(args *rpc.CreateArgs, reply *rpc.CreateReply, t
 	path := args.Path.ParsePath()
 
 	znode, idx := pn.rootZNode.lookupPrefix(path)
-	createdPath := strings.Join(path[:idx], "/")
+	createdPath := rpc.MakePpath(path[:idx])
 
 	if idx == -1 {
 		reply.CreatedBy = znode.creatorId
@@ -428,7 +435,7 @@ func (pn *PanServer) applyCreate(args *rpc.CreateArgs, reply *rpc.CreateReply, t
 	} else {
 		for ; idx < len(path); idx++ {
 			// fire the child watches, since we'll be adding a child to this path
-			pn.addFiredWatches(pn.childWatches.fire(rpc.Ppath(createdPath)))
+			pn.addFiredWatches(pn.childWatches.fire(createdPath))
 
 			// ignore the success/failure flag from addChild because already existing child should have been caught by lookupPrefix
 			if idx == len(path)-1 {
@@ -437,17 +444,17 @@ func (pn *PanServer) applyCreate(args *rpc.CreateArgs, reply *rpc.CreateReply, t
 				znode, _ = znode.addChild(path[idx], "", false, args.SessionId)
 			}
 
-			createdPath += "/" + znode.name
+			createdPath = createdPath.Add("/" + znode.name)
 
 			// fire the create watches with the updated path name, since we just created this node
-			pn.addFiredWatches(pn.createWatches.fire(rpc.Ppath(createdPath)))
+			pn.addFiredWatches(pn.createWatches.fire(createdPath))
 		}
 
 		if args.Flags.Ephemeral {
-			pn.ephemeralNodes[args.SessionId] = append(pn.ephemeralNodes[args.SessionId], rpc.Ppath(createdPath))
+			pn.ephemeralNodes[args.SessionId] = append(pn.ephemeralNodes[args.SessionId], createdPath)
 		}
 
-		reply.ZNodeName = rpc.Ppath(createdPath)
+		reply.ZNodeName = createdPath
 		reply.CreatedBy = znode.creatorId
 		reply.Err = rpc.OK
 	}
@@ -658,7 +665,7 @@ func (pn *PanServer) applyDelete(args *rpc.DeleteArgs, reply *rpc.DeleteReply, t
 	reply.Err = parentNode.removeChild(path[len(path)-1], args.Version, true)
 
 	// Fire child watches on the parent
-	pn.addFiredWatches(pn.childWatches.fire(rpc.Ppath(strings.Join(parentPath, "/"))))
+	pn.addFiredWatches(pn.childWatches.fire(rpc.MakePpath(parentPath)))
 
 	// Fire delete watches on the child
 	pn.addFiredWatches(pn.deleteWatches.fire(args.Path))
