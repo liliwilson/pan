@@ -185,6 +185,7 @@ func (pn *PanServer) addFiredWatches(fired map[Watch]*rpc.WatchArgs) {
 	for w, wargs := range fired {
 		pn.firedWatches[w] = wargs
 	}
+	pn.watchCond.Broadcast()
 }
 
 type PanServer struct {
@@ -209,6 +210,7 @@ type PanServer struct {
 	deleteWatches Watchlist
 	childWatches  Watchlist
 	firedWatches  map[Watch]*rpc.WatchArgs
+	watchCond     *sync.Cond
 }
 
 type TimestampedRequest struct {
@@ -719,9 +721,9 @@ func (pn *PanServer) WatchWait(args *rpc.WatchWaitArgs, reply *rpc.WatchWaitRepl
 			pn.mu.Unlock()
 			return
 		}
-		pn.mu.Unlock()
+		pn.watchCond.Wait()
 
-		time.Sleep(500 * time.Millisecond) // TODO make this happen w cond and wait
+		pn.mu.Unlock()
 	}
 }
 
@@ -758,6 +760,7 @@ func StartPanServer(servers []*labrpc.ClientEnd, gid tester.Tgid, me int, persis
 	pn := &PanServer{me: me, peers: servers, rootZNode: &ZNode{name: "", sequenceNums: make(map[string]int), sessionToSeqNum: make(map[Key]int)}, sessions: make(map[int]time.Time), ephemeralNodes: make(map[int][]rpc.Ppath)}
 
 	pn.initializeWatchlists()
+	pn.watchCond = sync.NewCond(&pn.mu)
 	pn.rsm = rsm.MakeRSM(servers, me, persister, maxraftstate, pn)
 
 	return []tester.IService{pn, pn.rsm.Raft()}
