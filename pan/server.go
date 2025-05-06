@@ -163,6 +163,19 @@ func (watchlist *Watchlist) append(path rpc.Ppath, watch *Watch) {
 	watchlist.watches[path] = append(watchlist.watches[path], watch)
 }
 
+// For a watchlist, remove any watches associated with the given sessionId
+func (watchlist *Watchlist) cleanup(sessionId int) {
+	for path, watches := range watchlist.watches {
+		validWatches := []*Watch{}
+		for _, watch := range watches {
+			if watch.sessionId != sessionId {
+				validWatches = append(validWatches, watch)
+			}
+		}
+		watchlist.watches[path] = validWatches
+	}
+}
+
 // Initialize watchlists for a new PanServer
 func (pn *PanServer) initializeWatchlists() {
 	pn.dataWatches = Watchlist{watchType: rpc.NodeDataChanged, watches: make(map[rpc.Ppath][]*Watch)}
@@ -170,6 +183,21 @@ func (pn *PanServer) initializeWatchlists() {
 	pn.deleteWatches = Watchlist{watchType: rpc.NodeDeleted, watches: make(map[rpc.Ppath][]*Watch)}
 	pn.childWatches = Watchlist{watchType: rpc.NodeChildrenChanged, watches: make(map[rpc.Ppath][]*Watch)}
 	pn.firedWatches = make(map[Watch]*rpc.WatchArgs)
+}
+
+// Clean up watchlists given a closed sessionid
+func (pn *PanServer) cleanWatchlists(sessionId int) {
+	pn.dataWatches.cleanup(sessionId)
+	pn.createWatches.cleanup(sessionId)
+	pn.deleteWatches.cleanup(sessionId)
+	pn.childWatches.cleanup(sessionId)
+
+	// Clean up the firedWatches struct
+	for watch := range pn.firedWatches {
+		if watch.sessionId == sessionId {
+			delete(pn.firedWatches, watch)
+		}
+	}
 }
 
 // Return the next watch Id to be assigned by the server
@@ -331,6 +359,9 @@ func (pn *PanServer) cleanupSession(sessionId int) {
 			pn.addFiredWatches(pn.deleteWatches.fire(rpc.MakePpath(path)))
 		}
 	}
+
+	// Clean up watches
+	pn.cleanWatchlists(sessionId)
 
 	delete(pn.sessions, sessionId)
 	delete(pn.ephemeralNodes, sessionId)
