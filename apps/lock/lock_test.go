@@ -24,7 +24,7 @@ func runLockClient(_ int, ch_err chan string, ch_done chan struct{}, clientCrash
 	session := ts.MakeSession()
 	ck := MakeClerk(session, "lock")
 
-	ck.Acquire(path)
+	ck.Acquire()
 	exists, _ := session.Exists(path+"/bad", rpc.Watch{})
 	if exists {
 		ch_err <- "Two clients acquired lock at the same time"
@@ -46,7 +46,7 @@ func runLockClient(_ int, ch_err chan string, ch_done chan struct{}, clientCrash
 	} else {
 		time.Sleep(5 * time.Second)
 		session.Delete(path+"/bad", 1)
-		ck.Release(path)
+		ck.Release()
 	}
 
 	ch_done <- struct{}{}
