@@ -177,7 +177,7 @@ func (ts *Test) StartSessionsAndWait(nclnt int, t time.Duration, file rpc.Ppath,
 			if _, ok := remaining[path]; ok {
 				err := fmt.Sprintf("Path %s created by two clients", path)
 				ch_err <- err
-				ts.t.FailNow()
+				return TestType{}
 			}
 			remaining[path] = true
 		}
