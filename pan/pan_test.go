@@ -194,7 +194,7 @@ func (ts *Test) GenericTest() {
 
 	ch_partitioner := make(chan bool)
 	ch_spawn := make(chan panapi.TestType)
-	ch_crash := make(chan struct{})
+	// ch_crash := make(chan struct{})
 	ch_err := make(chan string)
 	ck := ts.MakeSession()
 	results := make([]panapi.TestType, NITER)
@@ -208,25 +208,10 @@ func (ts *Test) GenericTest() {
 		// Let clients perform ops without interruption
 		time.Sleep(100 * time.Millisecond)
 
-		if ts.leaderCrash {
-			go func() {
-				for i := 0; i < ts.nservers; i++ {
-					ts.Group(Gid).ShutdownServer(i)
-					time.Sleep(T)
-					ts.Group(Gid).StartServer(i)
-				}
-				ts.Group(Gid).ConnectAll()
-				ch_crash <- struct{}{}
-			}()
-		}
-
 		if ts.partitions {
 			go ts.Partitioner(Gid, ch_partitioner)
 		}
 
-		if ts.leaderCrash {
-			<-ch_crash // waits for leaders to stop crashing
-		}
 		var res panapi.TestType
 		select {
 		case res = <-ch_spawn:
@@ -240,6 +225,17 @@ func (ts *Test) GenericTest() {
 			<-ch_partitioner
 			ts.Group(Gid).ConnectAll()
 			time.Sleep(T)
+		}
+
+		if ts.leaderCrash {
+			for i := 0; i < ts.nservers; i++ {
+				ts.Group(Gid).ShutdownServer(i)
+			}
+			time.Sleep(T)
+			for i := 0; i < ts.nservers; i++ {
+				ts.Group(Gid).StartServer(i)
+			}
+			ts.Group(Gid).ConnectAll()
 		}
 
 		// at this point, all network should be good
@@ -300,7 +296,7 @@ func TestBothClientCrashesLeaderCrashes(t *testing.T) {
 // 	ts.GenericTest()
 // }
 
-func TestWatch(t *testing.T) {
+func TestJustWatch(t *testing.T) {
 	ts := MakeTest(t, "Test Watches on all three functions", 3, 5, true, false, false, false, -1, false)
 	tester.AnnotateTest("TestWatchBasic", 5)
 	defer ts.Cleanup()
@@ -378,7 +374,7 @@ func TestWatch(t *testing.T) {
 				ts.t.Fatalf("Expected %s as the Path; got %s", dir, received.Path)
 			}
 			children, _ := ck.GetChildren(dir, rpc.Watch{ShouldWatch: false})
-			if len(children) != 2 || children[0] != rpc.Ppath(testfile1.Suffix()) || children[1] != rpc.Ppath(testfile1.Suffix()) {
+			if len(children) != 2 || children[0] != rpc.Ppath(testfile1.Suffix()) || children[1] != rpc.Ppath(testfile2.Suffix()) {
 				ts.t.Fatalf("Got %v from GetChildren; should be [%s, %s]", children, testfile1, testfile2)
 			}
 			ck.GetChildren(dir, rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
