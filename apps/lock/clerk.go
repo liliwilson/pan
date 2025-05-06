@@ -3,17 +3,71 @@ package lock
 import (
 	"pan/panapi"
 	"pan/panapi/rpc"
+	"strconv"
 )
 
-type Clerk struct{}
+type Clerk struct {
+	session     panapi.IPNSession
+	lockDir     rpc.Ppath
+	lockSuffix  rpc.Ppath
+	currentFile rpc.Ppath
+}
 
-func MakeClerk(session panapi.IPNSession, lockSuffix rpc.Ppath) *Clerk {
-	ck := &Clerk{}
+func MakeClerk(session panapi.IPNSession, lockDir rpc.Ppath, lockSuffix rpc.Ppath) *Clerk {
+	ck := &Clerk{session: session, lockDir: lockDir, lockSuffix: lockSuffix}
 	return ck
 }
 
-// Acquire the lock for a given path; this locks all children as well
-func (ck *Clerk) Acquire() {}
+// Returns true iff candidate is the child with the smallest sequence number
+func isSmallestSequence(children []rpc.Ppath, candidate rpc.Ppath) bool {
+	candidateSeq := candidate.GetSeqNumber()
+	for _, child := range children {
+		childSeq := child.GetSeqNumber()
+		if childSeq < candidateSeq {
+			return false
+		}
+	}
+	return true
+}
 
-// Release the lock for a given path; requires having the lock already
-func (ck *Clerk) Release() {}
+// Returns the sequence number of the node that a client that created fname should be watching
+func watchNode(children []rpc.Ppath, fname rpc.Ppath) int {
+	myNum := fname.GetSeqNumber()
+	current := -1
+	for _, child := range children {
+		childNum := child.GetSeqNumber()
+		if childNum >= myNum {
+			continue
+		} else {
+			current = max(current, childNum)
+		}
+	}
+	return current
+}
+
+// Acquire the lock for the fs
+func (ck *Clerk) Acquire() {
+	fname, _ := ck.session.Create(ck.lockDir+ck.lockSuffix, "", rpc.Flag{Sequential: true, Ephemeral: true})
+	ck.currentFile = fname
+	for {
+		children, _ := ck.session.GetChildren(ck.lockDir, rpc.Watch{ShouldWatch: false, Callback: rpc.EmptyWatch})
+		if isSmallestSequence(children, fname) {
+			return
+		} else {
+			shouldWatch := ck.lockDir + ck.lockSuffix + rpc.Ppath(strconv.Itoa(watchNode(children, fname)))
+			ch_wait := make(chan struct{})
+			exists, _ := ck.session.Exists(shouldWatch, rpc.Watch{ShouldWatch: true, Callback: func(_ rpc.WatchArgs) {
+				ch_wait <- struct{}{}
+			}})
+			if exists {
+				<-ch_wait
+			}
+		}
+	}
+}
+
+// Release the lock for the fs
+func (ck *Clerk) Release() {
+	ck.session.Delete(ck.currentFile, 1)
+	ck.currentFile = ""
+}

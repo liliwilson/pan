@@ -22,7 +22,7 @@ func runLockClient(_ int, ch_err chan string, ch_done chan struct{}, clientCrash
 	path := rpc.Ppath("/tester")
 
 	session := ts.MakeSession()
-	ck := MakeClerk(session, "lock")
+	ck := MakeClerk(session, "/lock", "/l-")
 
 	ck.Acquire()
 	exists, _ := session.Exists(path+"/bad", rpc.Watch{})
@@ -41,10 +41,10 @@ func runLockClient(_ int, ch_err chan string, ch_done chan struct{}, clientCrash
 	if choice == 0 && clientCrash {
 		ts.Crash(session)
 	} else if choice == 1 || choice == 2 {
-		time.Sleep(5 * time.Second)
+		time.Sleep(1 * time.Second)
 		session.EndSession()
 	} else {
-		time.Sleep(5 * time.Second)
+		time.Sleep(1 * time.Second)
 		session.Delete(path+"/bad", 1)
 		ck.Release()
 	}

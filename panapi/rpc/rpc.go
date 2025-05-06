@@ -1,6 +1,9 @@
 package rpc
 
-import "strings"
+import (
+	"strconv"
+	"strings"
+)
 
 type Pversion int
 type Ppath string
@@ -27,6 +30,18 @@ func MakePpath(path []string) Ppath {
 func (path *Ppath) Suffix() string {
 	dirs := path.ParsePath()
 	return dirs[len(dirs)-1]
+}
+
+func (path *Ppath) GetSeqNumber() int {
+	strPath := string(*path)
+	var i int
+	for i = len(strPath) - 1; i >= 0; i-- {
+		if !('0' <= strPath[i] && strPath[i] <= '9') {
+			break
+		}
+	}
+	output, _ := strconv.Atoi(strPath[i+1:])
+	return output
 }
 
 type Err string
