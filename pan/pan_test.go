@@ -422,16 +422,14 @@ func TestWatchWithServerFailure(t *testing.T) {
 			ck.Exists(testfile, rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
 				ch_create <- args
 			}})
-			if ts.leaderCrash { // Crash
-				for i := 0; i < ts.nservers; i++ {
-					ts.Group(Gid).ShutdownServer(i)
-				}
-				time.Sleep(time.Second)
-				for i := 0; i < ts.nservers; i++ {
-					ts.Group(Gid).StartServer(i)
-				}
-				ts.Group(Gid).ConnectAll()
+			for i := 0; i < ts.nservers; i++ {
+				ts.Group(Gid).ShutdownServer(i)
 			}
+			time.Sleep(time.Second)
+			for i := 0; i < ts.nservers; i++ {
+				ts.Group(Gid).StartServer(i)
+			}
+			ts.Group(Gid).ConnectAll()
 			ck.Delete(testfile, 1)
 			received = <-ch_create
 			if received.EventType != rpc.NodeDeleted {
@@ -450,16 +448,14 @@ func TestWatchWithServerFailure(t *testing.T) {
 			ck.GetData(testfile, rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
 				ch_newdata <- args
 			}})
-			if ts.leaderCrash {
-				for i := 0; i < ts.nservers; i++ {
-					ts.Group(Gid).ShutdownServer(i)
-				}
-				time.Sleep(time.Second)
-				for i := 0; i < ts.nservers; i++ {
-					ts.Group(Gid).StartServer(i)
-				}
-				ts.Group(Gid).ConnectAll()
+			for i := 0; i < ts.nservers; i++ {
+				ts.Group(Gid).ShutdownServer(i)
 			}
+			time.Sleep(time.Second)
+			for i := 0; i < ts.nservers; i++ {
+				ts.Group(Gid).StartServer(i)
+			}
+			ts.Group(Gid).ConnectAll()
 			randString := panapi.RandValue(15)
 			ck.SetData(testfile, randString, 1)
 			received := <-ch_newdata
@@ -480,16 +476,14 @@ func TestWatchWithServerFailure(t *testing.T) {
 			ck.GetChildren(dir, rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
 				ch_children <- args
 			}})
-			if ts.leaderCrash {
-				for i := 0; i < ts.nservers; i++ {
-					ts.Group(Gid).ShutdownServer(i)
-				}
-				time.Sleep(time.Second)
-				for i := 0; i < ts.nservers; i++ {
-					ts.Group(Gid).StartServer(i)
-				}
-				ts.Group(Gid).ConnectAll()
+			for i := 0; i < ts.nservers; i++ {
+				ts.Group(Gid).ShutdownServer(i)
 			}
+			time.Sleep(time.Second)
+			for i := 0; i < ts.nservers; i++ {
+				ts.Group(Gid).StartServer(i)
+			}
+			ts.Group(Gid).ConnectAll()
 			ck.Create(testfile1, "", rpc.Flag{})
 			received := <-ch_children
 			if received.EventType != rpc.NodeChildrenChanged {
@@ -584,16 +578,14 @@ func TestWatchEphermeralServerCrashes(t *testing.T) {
 	if !exists {
 		ts.t.Fatal("Expected /a/b to exist after creation")
 	}
-	if ts.leaderCrash { // Crash
-		for i := 0; i < ts.nservers; i++ {
-			ts.Group(Gid).ShutdownServer(i)
-		}
-		time.Sleep(time.Second)
-		for i := 0; i < ts.nservers; i++ {
-			ts.Group(Gid).StartServer(i)
-		}
-		ts.Group(Gid).ConnectAll()
+	for i := 0; i < ts.nservers; i++ {
+		ts.Group(Gid).ShutdownServer(i)
 	}
+	time.Sleep(time.Second)
+	for i := 0; i < ts.nservers; i++ {
+		ts.Group(Gid).StartServer(i)
+	}
+	ts.Group(Gid).ConnectAll()
 	crash <- struct{}{}
 	seen := false
 	now := time.Now()
@@ -649,16 +641,15 @@ func TestWatchSequentialWithServerCrash(t *testing.T) {
 		path, _ := ck.Create("/a/b-", "", rpc.Flag{Sequential: true})
 		ch_path <- path
 	}})
-	if ts.leaderCrash { // Crash
-		for i := 0; i < ts.nservers; i++ {
-			ts.Group(Gid).ShutdownServer(i)
-		}
-		time.Sleep(time.Second)
-		for i := 0; i < ts.nservers; i++ {
-			ts.Group(Gid).StartServer(i)
-		}
-		ts.Group(Gid).ConnectAll()
+	// Crash
+	for i := 0; i < ts.nservers; i++ {
+		ts.Group(Gid).ShutdownServer(i)
 	}
+	time.Sleep(time.Second)
+	for i := 0; i < ts.nservers; i++ {
+		ts.Group(Gid).StartServer(i)
+	}
+	ts.Group(Gid).ConnectAll()
 
 	ck2 := ts.MakeSession()
 	for range 50 {
