@@ -458,12 +458,14 @@ func (pn *PanServer) applyCreate(args *rpc.CreateArgs, reply *rpc.CreateReply, t
 	path := args.Path.ParsePath()
 
 	znode, idx := pn.rootZNode.lookupPrefix(path)
-	createdPath := rpc.MakePpath(path[:idx])
+	createdPath := args.Path
 
 	if idx == -1 {
 		reply.CreatedBy = znode.creatorId
 		reply.Err = rpc.ErrOnCreate
 	} else {
+		createdPath = rpc.MakePpath(path[:idx])
+
 		for ; idx < len(path); idx++ {
 			// fire the child watches, since we'll be adding a child to this path
 			pn.addFiredWatches(pn.childWatches.fire(createdPath))
