@@ -18,7 +18,7 @@ const (
 	NSERVERS = 5
 )
 
-func runLockClient(me int, ch_err chan string, ch_done chan struct{}, clientCrash bool, ts *pan.Test) {
+func runLockClient(_ int, ch_err chan string, ch_done chan struct{}, clientCrash bool, ts *pan.Test) {
 	path := rpc.Ppath("/tester")
 
 	session := ts.MakeSession()
@@ -28,10 +28,16 @@ func runLockClient(me int, ch_err chan string, ch_done chan struct{}, clientCras
 	exists, _ := session.Exists(path+"/bad", rpc.Watch{})
 	if exists {
 		ch_err <- "Two clients acquired lock at the same time"
+		ts.Fatalf("")
 		return
 	}
-	session.Create(path+"/bad", "", rpc.Flag{Ephemeral: true})
+	_, err := session.Create(path+"/bad", "", rpc.Flag{Ephemeral: true})
 	session.Create(path+"/seq-", "", rpc.Flag{Sequential: true})
+	if err == rpc.ErrOnCreate {
+		ch_err <- "Two clients acquired lock at the same time"
+		ts.Fatalf("")
+		return
+	}
 
 	choice := rand.Int() % 5
 	if choice == 0 && clientCrash {
@@ -55,25 +61,31 @@ func runClients(t *testing.T, title string, nclnts int, clientCrash bool, leader
 	session := ts.MakeSession()
 	seqPath := rpc.Ppath("/tester/seq-")
 
-	ch_err := make(chan string)
+	ch_errs := make([]chan string, nclnts)
 	ch_dones := make([]chan struct{}, nclnts)
 	ch_crash := make(chan struct{})
 	for i := range nclnts {
 		ch_dones[i] = make(chan struct{})
-		go runLockClient(i, ch_err, ch_dones[i], clientCrash, ts)
+		ch_errs[i] = make(chan string)
+		go runLockClient(i, ch_errs[i], ch_dones[i], clientCrash, ts)
 	}
 
 	if leaderCrash {
 		go func() {
-			defer func() { ts.Group(tester.GRP0).ConnectAll() }()
-			for i := 0; true; i = (i + 1) % NSERVERS {
+			for {
 				select {
 				case <-ch_crash:
 					return
 				default:
-					ts.Group(tester.GRP0).ShutdownServer(i)
+					for i := 0; i < NSERVERS; i++ {
+						ts.Group(tester.GRP0).ShutdownServer(i)
+					}
 					time.Sleep(time.Second)
-					ts.Group(tester.GRP0).StartServer(i)
+					for i := 0; i < NSERVERS; i++ {
+						ts.Group(tester.GRP0).StartServer(i)
+					}
+					ts.Group(tester.GRP0).ConnectAll()
+					time.Sleep(time.Second * 4)
 				}
 			}
 		}()
@@ -81,7 +93,7 @@ func runClients(t *testing.T, title string, nclnts int, clientCrash bool, leader
 
 	for i := range nclnts {
 		select {
-		case err := <-ch_err:
+		case err := <-ch_errs[i]:
 			t.Fatal(err)
 		case <-ch_dones[i]:
 			continue
