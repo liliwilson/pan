@@ -9,8 +9,19 @@ type Flag struct {
 	Sequential bool
 }
 
+// Convert a Ppath into a list of strings, split along slashes
 func (path *Ppath) ParsePath() []string {
 	return strings.Split(string(*path), "/")
+}
+
+// Add a string to a Ppath
+func (path *Ppath) Add(s string) Ppath {
+	return Ppath(string(*path) + s)
+}
+
+// Converts a list of strings into a Ppath, with "/" joining them
+func MakePpath(path []string) Ppath {
+	return Ppath(strings.Join(path, "/"))
 }
 
 func (path *Ppath) Suffix() string {
@@ -80,8 +91,9 @@ type ExistsArgs struct {
 }
 
 type ExistsReply struct {
-	Result bool
-	Err    Err
+	Result  bool
+	WatchId int
+	Err     Err
 }
 
 type GetDataArgs struct {
@@ -93,6 +105,7 @@ type GetDataArgs struct {
 type GetDataReply struct {
 	Data    string
 	Version Pversion
+	WatchId int
 	Err     Err
 }
 
@@ -115,6 +128,7 @@ type GetChildrenArgs struct {
 
 type GetChildrenReply struct {
 	Children []Ppath
+	WatchId  int
 	Err      Err
 }
 
@@ -136,4 +150,14 @@ type GetHighestSeqArgs struct {
 type GetHighestSeqReply struct {
 	SeqNum int
 	Err    Err
+}
+
+type WatchWaitArgs struct {
+	SessionId int
+	WatchId   int
+}
+
+type WatchWaitReply struct {
+	WatchEvent WatchArgs
+	Err        Err
 }

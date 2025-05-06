@@ -80,6 +80,7 @@ func (ck *Session) Create(path rpc.Ppath, data string, flags rpc.Flag) (rpc.Ppat
 	}
 }
 
+// Helper function for getting the highest sequence number of one of our sequential znodes with a given path.
 func (ck *Session) getHighestSequence(path rpc.Ppath) (int, rpc.Err) {
 	args := rpc.GetHighestSeqArgs{SessionId: ck.id, Path: path}
 
@@ -106,6 +107,7 @@ func (ck *Session) Delete(path rpc.Ppath, version rpc.Pversion) rpc.Err {
 		if ok && reply.Err != rpc.ErrWrongLeader {
 			return reply.Err
 		}
+
 		ck.incrementLeader()
 		time.Sleep(100 * time.Millisecond)
 	}
@@ -120,11 +122,34 @@ func (ck *Session) Exists(path rpc.Ppath, watch rpc.Watch) (bool, rpc.Err) {
 		leader := ck.getLeader()
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.Exists", &args, &reply)
 		if ok && reply.Err != rpc.ErrWrongLeader {
+			if watch.ShouldWatch {
+				go ck.WatchWait(reply.WatchId, watch.Callback)
+			}
+
 			return reply.Result, reply.Err
 		}
 		ck.incrementLeader()
 		time.Sleep(100 * time.Millisecond)
 	}
+}
+
+// Wait on a watchId. Called by Exists, GetData, and GetChildren
+func (ck *Session) WatchWait(watchId int, watchCallback func(rpc.WatchArgs)) {
+	args := rpc.WatchWaitArgs{SessionId: ck.id, WatchId: watchId}
+
+	for {
+		reply := rpc.WatchWaitReply{}
+		leader := ck.getLeader()
+		ok := ck.clnt.Call(ck.servers[leader], "PanServer.WatchWait", &args, &reply)
+		if ok && reply.Err != rpc.ErrWrongLeader {
+			// Call the watch callback
+			watchCallback(reply.WatchEvent)
+			return
+		}
+		ck.incrementLeader()
+		time.Sleep(100 * time.Millisecond)
+	}
+
 }
 
 // Returns the data and version information about znode
@@ -136,6 +161,10 @@ func (ck *Session) GetData(path rpc.Ppath, watch rpc.Watch) (string, rpc.Pversio
 		leader := ck.getLeader()
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.GetData", &args, &reply)
 		if ok && reply.Err != rpc.ErrWrongLeader {
+			if watch.ShouldWatch {
+				go ck.WatchWait(reply.WatchId, watch.Callback)
+			}
+
 			return reply.Data, reply.Version, reply.Err
 		}
 		ck.incrementLeader()
@@ -178,6 +207,10 @@ func (ck *Session) GetChildren(path rpc.Ppath, watch rpc.Watch) ([]rpc.Ppath, rp
 		leader := ck.getLeader()
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.GetChildren", &args, &reply)
 		if ok && reply.Err != rpc.ErrWrongLeader {
+			if watch.ShouldWatch {
+				go ck.WatchWait(reply.WatchId, watch.Callback)
+			}
+
 			return reply.Children, reply.Err
 		}
 		ck.incrementLeader()

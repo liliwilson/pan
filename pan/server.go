@@ -5,7 +5,6 @@ import (
 	"pan/panapi/rpc"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -134,8 +133,86 @@ func (zn *ZNode) lookupPrefix(path []string) (*ZNode, int) {
 }
 
 type Watch struct {
-	sessionId string
-	watchId   string
+	sessionId int
+	watchId   int
+}
+
+type Watchlist struct {
+	watchType string
+	watches   map[rpc.Ppath][]*Watch
+}
+
+// For a given watchlist, return a list of watches that should be fired based on the path
+func (watchlist *Watchlist) fire(path rpc.Ppath) map[Watch]*rpc.WatchArgs {
+	fired := make(map[Watch]*rpc.WatchArgs)
+
+	// Check if we have a watch on this node
+	if watches, exists := watchlist.watches[path]; exists {
+		for _, watch := range watches {
+			fired[*watch] = &rpc.WatchArgs{EventType: watchlist.watchType, Path: path}
+		}
+
+		delete(watchlist.watches, path)
+	}
+
+	return fired
+}
+
+// For a given watchlist, append the watch at the provided path to the list.
+func (watchlist *Watchlist) append(path rpc.Ppath, watch *Watch) {
+	watchlist.watches[path] = append(watchlist.watches[path], watch)
+}
+
+// For a watchlist, remove any watches associated with the given sessionId
+func (watchlist *Watchlist) cleanup(sessionId int) {
+	for path, watches := range watchlist.watches {
+		validWatches := []*Watch{}
+		for _, watch := range watches {
+			if watch.sessionId != sessionId {
+				validWatches = append(validWatches, watch)
+			}
+		}
+		watchlist.watches[path] = validWatches
+	}
+}
+
+// Initialize watchlists for a new PanServer
+func (pn *PanServer) initializeWatchlists() {
+	pn.dataWatches = Watchlist{watchType: rpc.NodeDataChanged, watches: make(map[rpc.Ppath][]*Watch)}
+	pn.createWatches = Watchlist{watchType: rpc.NodeCreated, watches: make(map[rpc.Ppath][]*Watch)}
+	pn.deleteWatches = Watchlist{watchType: rpc.NodeDeleted, watches: make(map[rpc.Ppath][]*Watch)}
+	pn.childWatches = Watchlist{watchType: rpc.NodeChildrenChanged, watches: make(map[rpc.Ppath][]*Watch)}
+	pn.firedWatches = make(map[Watch]*rpc.WatchArgs)
+}
+
+// Clean up watchlists given a closed sessionid
+func (pn *PanServer) cleanWatchlists(sessionId int) {
+	pn.dataWatches.cleanup(sessionId)
+	pn.createWatches.cleanup(sessionId)
+	pn.deleteWatches.cleanup(sessionId)
+	pn.childWatches.cleanup(sessionId)
+
+	// Clean up the firedWatches struct
+	for watch := range pn.firedWatches {
+		if watch.sessionId == sessionId {
+			delete(pn.firedWatches, watch)
+		}
+	}
+}
+
+// Return the next watch Id to be assigned by the server
+func (pn *PanServer) getWatchId() int {
+	id := pn.nextWatchId
+	pn.nextWatchId++
+	return id
+}
+
+// Given a map of fired watches produced by watchlist.fire(), add them to the PanServer's firedWatches map
+func (pn *PanServer) addFiredWatches(fired map[Watch]*rpc.WatchArgs) {
+	for w, wargs := range fired {
+		pn.firedWatches[w] = wargs
+	}
+	pn.watchCond.Broadcast()
 }
 
 type PanServer struct {
@@ -145,13 +222,22 @@ type PanServer struct {
 	peers []*labrpc.ClientEnd
 
 	// ZK data structures
-	mu             sync.Mutex
-	rootZNode      *ZNode
-	sessions       map[int]time.Time      // map session ID to timeout
-	dataWatches    map[rpc.Ppath][]*Watch // map path to list of data watches on that path
-	childWatches   map[rpc.Ppath][]*Watch // map path to list of child watches on that path
-	ephemeralNodes map[int][]rpc.Ppath    // map session IDs to list of ephemeral znode paths
+	mu        sync.Mutex
+	rootZNode *ZNode
+
+	// Session data
+	sessions       map[int]time.Time // map session ID to timeout
 	sessionCounter int
+	ephemeralNodes map[int][]rpc.Ppath // map session IDs to list of ephemeral znode paths
+
+	// Watches data
+	nextWatchId   int
+	dataWatches   Watchlist
+	createWatches Watchlist
+	deleteWatches Watchlist
+	childWatches  Watchlist
+	firedWatches  map[Watch]*rpc.WatchArgs
+	watchCond     *sync.Cond
 }
 
 type TimestampedRequest struct {
@@ -260,16 +346,28 @@ func (pn *PanServer) cleanupSession(sessionId int) {
 	ephemeralNodes := pn.ephemeralNodes[sessionId]
 	for _, path := range ephemeralNodes {
 		path := path.ParsePath()
-		parentNode := pn.rootZNode.lookup(path[:len(path)-1])
+
+		parentPath := path[:len(path)-1]
+		parentNode := pn.rootZNode.lookup(parentPath)
+
 		if parentNode != nil {
 			parentNode.removeChild(path[len(path)-1], 0, false)
+
+			// Fire child watches on the parent
+			pn.addFiredWatches(pn.childWatches.fire(rpc.MakePpath(parentPath)))
+			// Fire delete watches on the child
+			pn.addFiredWatches(pn.deleteWatches.fire(rpc.MakePpath(path)))
 		}
 	}
+
+	// Clean up watches
+	pn.cleanWatchlists(sessionId)
 
 	delete(pn.sessions, sessionId)
 	delete(pn.ephemeralNodes, sessionId)
 }
 
+// Returns the highest sequence number of a node with a given path owned by the current session.
 func (pn *PanServer) GetHighestSequence(args *rpc.GetHighestSeqArgs, reply *rpc.GetHighestSeqReply) {
 	tsReq := TimestampedRequest{Timestamp: time.Now().UnixMicro(), Request: *args}
 	err, res := pn.rsm.Submit(tsReq)
@@ -360,22 +458,28 @@ func (pn *PanServer) applyCreate(args *rpc.CreateArgs, reply *rpc.CreateReply, t
 	path := args.Path.ParsePath()
 
 	znode, idx := pn.rootZNode.lookupPrefix(path)
+	createdPath := rpc.MakePpath(path[:idx])
 
 	if idx == -1 {
 		reply.CreatedBy = znode.creatorId
 		reply.Err = rpc.ErrOnCreate
 	} else {
 		for ; idx < len(path); idx++ {
+			// fire the child watches, since we'll be adding a child to this path
+			pn.addFiredWatches(pn.childWatches.fire(createdPath))
+
 			// ignore the success/failure flag from addChild because already existing child should have been caught by lookupPrefix
 			if idx == len(path)-1 {
 				znode, _ = znode.addChild(path[idx], args.Data, args.Flags.Sequential, args.SessionId)
-				path[len(path)-1] = znode.name // update path with seq name
 			} else {
 				znode, _ = znode.addChild(path[idx], "", false, args.SessionId)
 			}
-		}
 
-		createdPath := rpc.Ppath(strings.Join(path, "/"))
+			createdPath = createdPath.Add("/" + znode.name)
+
+			// fire the create watches with the updated path name, since we just created this node
+			pn.addFiredWatches(pn.createWatches.fire(createdPath))
+		}
 
 		if args.Flags.Ephemeral {
 			pn.ephemeralNodes[args.SessionId] = append(pn.ephemeralNodes[args.SessionId], createdPath)
@@ -414,6 +518,19 @@ func (pn *PanServer) applyExists(args *rpc.ExistsArgs, reply *rpc.ExistsReply, t
 	// if we found a znode, lookup returns true
 	reply.Result = zn != nil
 	reply.Err = rpc.OK
+
+	// add a watch if the flag is set
+	if args.Watch.ShouldWatch {
+		watchId := pn.getWatchId()
+		reply.WatchId = watchId
+
+		// TODO is this right
+		if reply.Result {
+			pn.deleteWatches.append(args.Path, &Watch{watchId: watchId, sessionId: args.SessionId})
+		} else {
+			pn.createWatches.append(args.Path, &Watch{watchId: watchId, sessionId: args.SessionId})
+		}
+	}
 }
 
 // Get the data for a given znode.
@@ -448,6 +565,12 @@ func (pn *PanServer) applyGetData(args *rpc.GetDataArgs, reply *rpc.GetDataReply
 		reply.Err = rpc.ErrNoFile
 	}
 
+	// add a watch if the flag is set
+	if args.Watch.ShouldWatch {
+		watchId := pn.getWatchId()
+		reply.WatchId = watchId
+		pn.dataWatches.append(args.Path, &Watch{watchId: watchId, sessionId: args.SessionId})
+	}
 }
 
 // Set the data for a given znode.
@@ -478,6 +601,9 @@ func (pn *PanServer) applySetData(args *rpc.SetDataArgs, reply *rpc.SetDataReply
 		if zn.version == args.Version {
 			zn.data = args.Data
 			zn.version++
+
+			// Fire the data watches
+			pn.addFiredWatches(pn.dataWatches.fire(args.Path))
 
 			reply.Err = rpc.OK
 		} else {
@@ -520,6 +646,13 @@ func (pn *PanServer) applyGetChildren(args *rpc.GetChildrenArgs, reply *rpc.GetC
 
 		reply.Children = childrenPaths
 		reply.Err = rpc.OK
+
+		// add a watch if the flag is set
+		if args.Watch.ShouldWatch {
+			watchId := pn.getWatchId()
+			reply.WatchId = watchId
+			pn.childWatches.append(args.Path, &Watch{watchId: watchId, sessionId: args.SessionId})
+		}
 	} else {
 		reply.Err = rpc.ErrNoFile
 	}
@@ -553,13 +686,20 @@ func (pn *PanServer) applyDelete(args *rpc.DeleteArgs, reply *rpc.DeleteReply, t
 		return
 	}
 
-	parentNode := pn.rootZNode.lookup(path[:len(path)-1])
+	parentPath := path[:len(path)-1]
+	parentNode := pn.rootZNode.lookup(parentPath)
 	if parentNode == nil {
 		reply.Err = rpc.ErrNoFile
 		return
 	}
 
 	reply.Err = parentNode.removeChild(path[len(path)-1], args.Version, true)
+
+	// Fire child watches on the parent
+	pn.addFiredWatches(pn.childWatches.fire(rpc.MakePpath(parentPath)))
+
+	// Fire delete watches on the child
+	pn.addFiredWatches(pn.deleteWatches.fire(args.Path))
 }
 
 // Reset the timeout for a given session.
@@ -603,6 +743,28 @@ func (pn *PanServer) applyEndSession(args *rpc.EndSessionArgs, reply *rpc.EndSes
 	reply.Err = rpc.OK
 }
 
+// Call this function with a watchId and return when that watch is fired.
+func (pn *PanServer) WatchWait(args *rpc.WatchWaitArgs, reply *rpc.WatchWaitReply) {
+	goalWatch := Watch{sessionId: args.SessionId, watchId: args.WatchId}
+
+	for !pn.killed() {
+		pn.mu.Lock()
+
+		// Check if the watch has been fired.
+		if watchInfo, exists := pn.firedWatches[goalWatch]; exists {
+			reply.WatchEvent = *watchInfo
+			reply.Err = rpc.OK
+
+			delete(pn.firedWatches, goalWatch)
+			pn.mu.Unlock()
+			return
+		}
+		pn.watchCond.Wait()
+
+		pn.mu.Unlock()
+	}
+}
+
 // Kill this server.
 func (pn *PanServer) Kill() {
 	atomic.StoreInt32(&pn.dead, 1)
@@ -613,8 +775,7 @@ func (pn *PanServer) killed() bool {
 	return z == 1
 }
 
-// Must return quickly
-func StartPanServer(servers []*labrpc.ClientEnd, gid tester.Tgid, me int, persister *tester.Persister, maxraftstate int) []tester.IService {
+func registerLabgobArgs() {
 	labgob.Register(rsm.Op{})
 	labgob.Register(rpc.StartSessionArgs{})
 	labgob.Register(rpc.EndSessionArgs{})
@@ -626,9 +787,18 @@ func StartPanServer(servers []*labrpc.ClientEnd, gid tester.Tgid, me int, persis
 	labgob.Register(rpc.GetChildrenArgs{})
 	labgob.Register(rpc.DeleteArgs{})
 	labgob.Register(rpc.GetHighestSeqArgs{})
+	labgob.Register(rpc.WatchWaitArgs{})
 	labgob.Register(TimestampedRequest{})
+}
+
+// Must return quickly
+func StartPanServer(servers []*labrpc.ClientEnd, gid tester.Tgid, me int, persister *tester.Persister, maxraftstate int) []tester.IService {
+	registerLabgobArgs()
 
 	pn := &PanServer{me: me, peers: servers, rootZNode: &ZNode{name: "", sequenceNums: make(map[string]int), sessionToSeqNum: make(map[Key]int)}, sessions: make(map[int]time.Time), ephemeralNodes: make(map[int][]rpc.Ppath)}
+
+	pn.initializeWatchlists()
+	pn.watchCond = sync.NewCond(&pn.mu)
 	pn.rsm = rsm.MakeRSM(servers, me, persister, maxraftstate, pn)
 
 	return []tester.IService{pn, pn.rsm.Raft()}
