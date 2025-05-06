@@ -390,6 +390,124 @@ func TestJustWatch(t *testing.T) {
 	}
 }
 
+func TestWatchWithServerFailure(t *testing.T) {
+	ts := MakeTest(t, "Test Watches on all three functions", 3, 5, true, true, false, false, -1, false)
+	tester.AnnotateTest("TestWatchBasic", 5)
+	defer ts.Cleanup()
+
+	ck := ts.MakeSession()
+	const (
+		NITERS = 3
+	)
+	for i := range NITERS {
+		dir := rpc.Ppath(fmt.Sprintf("/a/b%d", i))
+		ck.Create(dir, "init", rpc.Flag{})
+		if i%3 == 0 { // Exists
+			testfile := dir + "/create"
+			ch_create := make(chan rpc.WatchArgs)
+			ck.Exists(testfile, rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
+				ch_create <- args
+			}})
+			ck.Create(testfile, "start", rpc.Flag{})
+			received := <-ch_create
+			if received.EventType != rpc.NodeCreated {
+				ts.t.Fatalf("Expected rpc.NodeCreated as the event type; got %s", received.EventType)
+			} else if received.Path != testfile {
+				ts.t.Fatalf("Expected %s as the Path; got %s", testfile, received.Path)
+			}
+			exists, _ := ck.Exists(testfile, rpc.Watch{ShouldWatch: false, Callback: rpc.EmptyWatch})
+			if !exists {
+				ts.t.Fatalf("%s does not exist after watch signalling creation", testfile)
+			}
+			ck.Exists(testfile, rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
+				ch_create <- args
+			}})
+			for i := 0; i < ts.nservers; i++ {
+				ts.Group(Gid).ShutdownServer(i)
+			}
+			time.Sleep(time.Second)
+			for i := 0; i < ts.nservers; i++ {
+				ts.Group(Gid).StartServer(i)
+			}
+			ts.Group(Gid).ConnectAll()
+			ck.Delete(testfile, 1)
+			received = <-ch_create
+			if received.EventType != rpc.NodeDeleted {
+				ts.t.Fatalf("Expected rpc.NodeDeleted as the event type; got %s", received.EventType)
+			} else if received.Path != testfile {
+				ts.t.Fatalf("Expected %s as the Path; got %s", testfile, received.Path)
+			}
+			exists, _ = ck.Exists(testfile, rpc.Watch{ShouldWatch: false, Callback: rpc.EmptyWatch})
+			if exists {
+				ts.t.Fatalf("%s exists after watch signalling deletion", testfile)
+			}
+		} else if i%3 == 1 { // GetData
+			testfile := dir + "/create"
+			ck.Create(testfile, "init", rpc.Flag{})
+			ch_newdata := make(chan rpc.WatchArgs)
+			ck.GetData(testfile, rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
+				ch_newdata <- args
+			}})
+			for i := 0; i < ts.nservers; i++ {
+				ts.Group(Gid).ShutdownServer(i)
+			}
+			time.Sleep(time.Second)
+			for i := 0; i < ts.nservers; i++ {
+				ts.Group(Gid).StartServer(i)
+			}
+			ts.Group(Gid).ConnectAll()
+			randString := panapi.RandValue(15)
+			ck.SetData(testfile, randString, 1)
+			received := <-ch_newdata
+			if received.EventType != rpc.NodeDataChanged {
+				ts.t.Fatalf("Expected rpc.NodeDataChanged as the event type; got %s", received.EventType)
+			} else if received.Path != testfile {
+				ts.t.Fatalf("Expected %s as the Path; got %s", testfile, received.Path)
+			}
+			data, _, _ := ck.GetData(testfile, rpc.Watch{ShouldWatch: false, Callback: rpc.EmptyWatch})
+			if data != randString {
+				ts.t.Fatal("Got different data from read than what was written")
+			}
+		} else { // GetChildren
+			testfile1 := dir + "/create"
+			testfile2 := dir + "/delete"
+			ck.Create(testfile2, "", rpc.Flag{})
+			ch_children := make(chan rpc.WatchArgs)
+			ck.GetChildren(dir, rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
+				ch_children <- args
+			}})
+			for i := 0; i < ts.nservers; i++ {
+				ts.Group(Gid).ShutdownServer(i)
+			}
+			time.Sleep(time.Second)
+			for i := 0; i < ts.nservers; i++ {
+				ts.Group(Gid).StartServer(i)
+			}
+			ts.Group(Gid).ConnectAll()
+			ck.Create(testfile1, "", rpc.Flag{})
+			received := <-ch_children
+			if received.EventType != rpc.NodeChildrenChanged {
+				ts.t.Fatalf("Expected rpc.NodeChildrenChanged as the event type; got %s", received.EventType)
+			} else if received.Path != dir {
+				ts.t.Fatalf("Expected %s as the Path; got %s", dir, received.Path)
+			}
+			children, _ := ck.GetChildren(dir, rpc.Watch{ShouldWatch: false})
+			if len(children) != 2 || children[0] != rpc.Ppath(testfile1.Suffix()) || children[1] != rpc.Ppath(testfile2.Suffix()) {
+				ts.t.Fatalf("Got %v from GetChildren; should be [%s, %s]", children, testfile1, testfile2)
+			}
+			ck.GetChildren(dir, rpc.Watch{ShouldWatch: true, Callback: func(args rpc.WatchArgs) {
+				ch_children <- args
+			}})
+			ck.Delete(testfile2, 1)
+			received = <-ch_children
+			children, _ = ck.GetChildren(dir, rpc.Watch{ShouldWatch: false})
+			if len(children) != 1 || children[0] != rpc.Ppath(testfile1.Suffix()) {
+				ts.t.Fatalf("Got %v from watch; should be [create]", children)
+			}
+		}
+	}
+}
+
 // Create an ephemeral znode, and then crash. Watching client should see notif
 // Implicitly tests disconnecting client causes ephemeral znode to disappear
 func TestWatchEphermeral(t *testing.T) {
@@ -435,6 +553,57 @@ func TestWatchEphermeral(t *testing.T) {
 	}
 }
 
+func TestWatchEphermeralServerCrashes(t *testing.T) {
+	ts := MakeTest(t, "Test Watches on Ephemeral Znodes", 3, 5, true, true, false, false, -1, false)
+	tester.AnnotateTest("TestWatchEphemeral", 5)
+	defer ts.Cleanup()
+
+	created := make(chan struct{})
+	crash := make(chan struct{})
+	ck := ts.MakeSession()
+	go func() {
+		ck1 := ts.MakeSession()
+		ck1.Create("/a/b", "data", rpc.Flag{Ephemeral: true})
+		created <- struct{}{}
+		<-crash
+		ts.Crash(ck1)
+	}()
+
+	<-created // /a/b has been created
+	ch_watch := make(chan struct{})
+	exists, _ := ck.Exists("/a/b", rpc.Watch{
+		ShouldWatch: true,
+		Callback:    func(_ rpc.WatchArgs) { ch_watch <- struct{}{} },
+	})
+	if !exists {
+		ts.t.Fatal("Expected /a/b to exist after creation")
+	}
+	for i := 0; i < ts.nservers; i++ {
+		ts.Group(Gid).ShutdownServer(i)
+	}
+	time.Sleep(time.Second)
+	for i := 0; i < ts.nservers; i++ {
+		ts.Group(Gid).StartServer(i)
+	}
+	ts.Group(Gid).ConnectAll()
+	crash <- struct{}{}
+	seen := false
+	now := time.Now()
+	for !seen || time.Since(now) < 1*time.Second {
+		select {
+		case <-ch_watch:
+			seen = true
+			now = time.Now()
+		default:
+			exists, _ := ck.Exists("/a/b", rpc.Watch{ShouldWatch: false, Callback: func(_ rpc.WatchArgs) {}})
+			if exists && seen {
+				ts.t.Fatal("/a/b is visible after watch triggered")
+			}
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+}
+
 func TestWatchSequential(t *testing.T) {
 	ts := MakeTest(t, "Test Watches on sequential nodes", 3, 5, true, false, false, false, -1, false)
 	tester.AnnotateTest("TestWatchSequential", 5)
@@ -446,6 +615,41 @@ func TestWatchSequential(t *testing.T) {
 		path, _ := ck.Create("/a/b-", "", rpc.Flag{Sequential: true})
 		ch_path <- path
 	}})
+
+	ck2 := ts.MakeSession()
+	for range 50 {
+		ck2.Create("/a/b-", "", rpc.Flag{Sequential: true})
+	}
+	path := <-ch_path
+	children, _ := ck.GetChildren("/a", rpc.Watch{ShouldWatch: false, Callback: rpc.EmptyWatch})
+	if len(children) != 51 {
+		ts.t.Fatalf("Expected /a to have 51 children; got %d instead", len(children))
+	}
+	if !slices.Contains(children, rpc.Ppath(path.Suffix())) {
+		ts.t.Fatalf("/a does not have znode created by callback")
+	}
+}
+
+func TestWatchSequentialWithServerCrash(t *testing.T) {
+	ts := MakeTest(t, "Test Watches on sequential nodes", 3, 5, true, false, false, false, -1, false)
+	tester.AnnotateTest("TestWatchSequential", 5)
+	defer ts.Cleanup()
+
+	ck := ts.MakeSession()
+	ch_path := make(chan rpc.Ppath)
+	ck.Exists("/a/b-30", rpc.Watch{ShouldWatch: true, Callback: func(_ rpc.WatchArgs) {
+		path, _ := ck.Create("/a/b-", "", rpc.Flag{Sequential: true})
+		ch_path <- path
+	}})
+	// Crash
+	for i := 0; i < ts.nservers; i++ {
+		ts.Group(Gid).ShutdownServer(i)
+	}
+	time.Sleep(time.Second)
+	for i := 0; i < ts.nservers; i++ {
+		ts.Group(Gid).StartServer(i)
+	}
+	ts.Group(Gid).ConnectAll()
 
 	ck2 := ts.MakeSession()
 	for range 50 {
