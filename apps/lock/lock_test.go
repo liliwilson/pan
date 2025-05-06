@@ -28,14 +28,12 @@ func runLockClient(_ int, ch_err chan string, ch_done chan struct{}, clientCrash
 	exists, _ := session.Exists(path+"/bad", rpc.Watch{})
 	if exists {
 		ch_err <- "Two clients acquired lock at the same time"
-		ts.Fatalf("")
 		return
 	}
 	_, err := session.Create(path+"/bad", "", rpc.Flag{Ephemeral: true})
 	session.Create(path+"/seq-", "", rpc.Flag{Sequential: true})
 	if err == rpc.ErrOnCreate {
 		ch_err <- "Two clients acquired lock at the same time"
-		ts.Fatalf("")
 		return
 	}
 
