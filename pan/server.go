@@ -148,6 +148,7 @@ func (watchlist *Watchlist) fire(path rpc.Ppath) map[Watch]*rpc.WatchArgs {
 
 	// Check if we have a watch on this node
 	if watches, exists := watchlist.watches[path]; exists {
+		DebugPrint(dWatch, "S0 firing watch on %v", path)
 		for _, watch := range watches {
 			fired[*watch] = &rpc.WatchArgs{EventType: watchlist.watchType, Path: path}
 		}
@@ -327,11 +328,15 @@ func (pn *PanServer) checkSession(sessionId int, timestamp time.Time) bool {
 
 	for session, timeout := range pn.sessions {
 		if session != sessionId && timestamp.After(timeout) {
+			DebugPrint(dTimeout, "S0 ending session %d due to timeout", session)
 			pn.cleanupSession(session)
 		}
 	}
 
 	if !ok || timestamp.After(timeout) {
+		if timestamp.After(timeout) {
+			DebugPrint(dTimeout, "S0 ending session %d due to timeout", sessionId)
+		}
 		pn.cleanupSession(sessionId)
 		return false
 	}
@@ -352,6 +357,7 @@ func (pn *PanServer) cleanupSession(sessionId int) {
 
 		if parentNode != nil {
 			parentNode.removeChild(path[len(path)-1], 0, false)
+			DebugPrint(dEphemeral, "S0 deleting ephemeral znode %v from session %d", rpc.MakePpath(path), sessionId)
 
 			// Fire child watches on the parent
 			pn.addFiredWatches(pn.childWatches.fire(rpc.MakePpath(parentPath)))

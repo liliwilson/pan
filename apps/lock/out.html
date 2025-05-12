@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+    <style>
+        body { 
+            background-color: #1e1e1e; 
+            color: #ffffff; 
+            font-family: monospace;
+            padding: 20px;
+        }
+        .log-container {
+            display: grid;
+            grid-template-columns: repeat(var(--n-columns), 1fr);
+            gap: 0;
+            border: 1px dotted #444;
+        }
+        .log-entry {
+            padding: 8px;
+            margin: 0;
+            white-space: pre-wrap;
+            border-bottom: 1px dotted #444;
+            border-right: 1px dotted #444;
+            min-height: 1.2em;
+        }
+        .log-entry:last-child {
+            border-right: none;
+        }
+        .log-container:last-child .log-entry {
+            border-bottom: none;
+        }
+        .timestamp {
+            color: #888888;
+        }
+        /* Single column log entries */
+        .log-entry:only-child {
+            border: none;
+            border-bottom: 1px dotted #444;
+        }
+        .log-entry:only-child:last-child {
+            border-bottom: none;
+        }
+    </style>
+    <style>:root { --n-columns: 6; }</style>
+</head>
+<body>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"><span style="color: #00813c">S1 created znode /lock/l-0 (EPH, SEQ)</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #00813c">S3 created znode /lock/l-1 (EPH, SEQ)</span></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #00813c">S4 created znode /lock/l-2 (EPH, SEQ)</span></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"><span style="color: #00813c">S1 created znode /tester/lock_owner (EPH)</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #00813c">S2 created znode /lock/l-3 (EPH, SEQ)</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"><span style="color: #00813c">S1 created znode /tester/seq-0 (SEQ)</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #398280">S4 setting an exists watch on /lock/l-1 with id 0</span></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #398280">S2 setting an exists watch on /lock/l-2 with id 1</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #398280">S3 setting an exists watch on /lock/l-0 with id 2</span></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #00813c">S5 created znode /lock/l-4 (EPH, SEQ)</span></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #398280">S5 setting an exists watch on /lock/l-3 with id 3</span></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"><span style="color: #d08341">S1 ended by client</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"><span style="color: #70c43f">PAN deleting ephemeral znode /lock/l-0 from session 1</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"><span style="color: #398280">PAN firing watch on /lock/l-0</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"><span style="color: #70c43f">PAN deleting ephemeral znode /tester/lock_owner from session 1</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #398280">S3 received a watch trigger on watch 2</span></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"><span style="color: #FD971F">PAN ending session 1 due to timeout</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #00813c">S3 created znode /tester/lock_owner (EPH)</span></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #00813c">S3 created znode /tester/seq-1 (SEQ)</span></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #98719f">S3 deleted znode /tester/lock_owner</span></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"><span style="color: #398280">PAN firing watch on /lock/l-1</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #398280">S4 received a watch trigger on watch 0</span></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #98719f">S3 deleted znode /lock/l-1</span></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #00813c">S4 created znode /tester/lock_owner (EPH)</span></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #00813c">S4 created znode /tester/seq-2 (SEQ)</span></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #98719f">S4 deleted znode /tester/lock_owner</span></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"><span style="color: #398280">PAN firing watch on /lock/l-2</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #98719f">S4 deleted znode /lock/l-2</span></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #398280">S2 received a watch trigger on watch 1</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #00813c">S2 created znode /tester/lock_owner (EPH)</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #00813c">S2 created znode /tester/seq-3 (SEQ)</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #d08341">S2 ended by client</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"><span style="color: #70c43f">PAN deleting ephemeral znode /lock/l-3 from session 2</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"><span style="color: #398280">PAN firing watch on /lock/l-3</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"><span style="color: #70c43f">PAN deleting ephemeral znode /tester/lock_owner from session 2</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"><span style="color: #FD971F">PAN ending session 2 due to timeout</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #398280">S5 received a watch trigger on watch 3</span></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #00813c">S5 created znode /tester/lock_owner (EPH)</span></div></div>
+<div class="log-container"><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"><span style="color: #00813c">S5 created znode /tester/seq-4 (SEQ)</span></div></div>
+<div class="log-container"><div class="log-entry"><span style="color: #00813c">PAN created znode /tester/seq-5 (SEQ)</span></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div><div class="log-entry"></div></div>
+<div class="log-entry">PASS
+</div>
+</body>
+</html>

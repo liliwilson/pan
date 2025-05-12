@@ -56,10 +56,11 @@ func (ck *Session) Create(path rpc.Ppath, data string, flags rpc.Flag) (rpc.Ppat
 		if ok && reply.Err != rpc.ErrWrongLeader {
 			// If the znode already exists, but we created it, return OK. This may come up in crash cases.
 			if reply.Err == rpc.ErrOnCreate && reply.CreatedBy == ck.id {
+				DebugPrint(dCreate, "S%d created znode %v (already created) %v", ck.id, reply.ZNodeName, PrintFlags(flags))
 				return reply.ZNodeName, rpc.OK
 			}
 
-			// fmt.Printf("client with session id %d created %v, with error %v\n", ck.id, reply.ZNodeName, reply.Err)
+			DebugPrint(dCreate, "S%d created znode %v %v", ck.id, reply.ZNodeName, PrintFlags(flags))
 			return reply.ZNodeName, reply.Err
 		}
 
@@ -70,6 +71,7 @@ func (ck *Session) Create(path rpc.Ppath, data string, flags rpc.Flag) (rpc.Ppat
 				newSeqNum, _ := ck.getHighestSequence(path)
 				if newSeqNum > oldSeqNum {
 					updatedPath := path + rpc.Ppath(strconv.Itoa(newSeqNum))
+					DebugPrint(dCreate, "S%d created znode %v %v", ck.id, updatedPath, PrintFlags(flags))
 					return updatedPath, reply.Err
 				}
 			}
@@ -105,6 +107,7 @@ func (ck *Session) Delete(path rpc.Ppath, version rpc.Pversion) rpc.Err {
 		leader := ck.getLeader()
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.Delete", &args, &reply)
 		if ok && reply.Err != rpc.ErrWrongLeader {
+			DebugPrint(dDelete, "S%d deleted znode %v", ck.id, args.Path)
 			return reply.Err
 		}
 
@@ -123,9 +126,11 @@ func (ck *Session) Exists(path rpc.Ppath, watch rpc.Watch) (bool, rpc.Err) {
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.Exists", &args, &reply)
 		if ok && reply.Err != rpc.ErrWrongLeader {
 			if watch.ShouldWatch {
+				DebugPrint(dWatch, "S%d setting an exists watch on %v with id %d", ck.id, path, reply.WatchId)
 				go ck.WatchWait(reply.WatchId, watch.Callback)
 			}
 
+			DebugPrint(dExists, "S%d called exists on znode %v, got result %v and watchId %d", ck.id, args.Path, reply.Result, reply.WatchId)
 			return reply.Result, reply.Err
 		}
 		ck.incrementLeader()
@@ -142,6 +147,7 @@ func (ck *Session) WatchWait(watchId int, watchCallback func(rpc.WatchArgs)) {
 		leader := ck.getLeader()
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.WatchWait", &args, &reply)
 		if ok && reply.Err != rpc.ErrWrongLeader {
+			DebugPrint(dWatch, "S%d received a watch trigger on watch %d", ck.id, watchId)
 			// Call the watch callback
 			watchCallback(reply.WatchEvent)
 			return
@@ -162,9 +168,11 @@ func (ck *Session) GetData(path rpc.Ppath, watch rpc.Watch) (string, rpc.Pversio
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.GetData", &args, &reply)
 		if ok && reply.Err != rpc.ErrWrongLeader {
 			if watch.ShouldWatch {
+				DebugPrint(dWatch, "S%d setting a data watch on %v with id %d", ck.id, path, reply.WatchId)
 				go ck.WatchWait(reply.WatchId, watch.Callback)
 			}
 
+			DebugPrint(dGetData, "S%d called get on %v, got data %v, version %v, error %v with watchId %d", ck.id, path, reply.Data, reply.Version, reply.Err, reply.WatchId)
 			return reply.Data, reply.Version, reply.Err
 		}
 		ck.incrementLeader()
@@ -180,6 +188,7 @@ func (ck *Session) SetData(path rpc.Ppath, data string, version rpc.Pversion) rp
 	leader := ck.getLeader()
 	ok := ck.clnt.Call(ck.servers[leader], "PanServer.SetData", &args, &reply)
 	if ok && reply.Err != rpc.ErrWrongLeader {
+		DebugPrint(dSetData, "S%d called setData on %v with  data %v and version %v, got error %v", ck.id, path, data, version, reply.Err)
 		return reply.Err
 	}
 
@@ -189,8 +198,10 @@ func (ck *Session) SetData(path rpc.Ppath, data string, version rpc.Pversion) rp
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.SetData", &args, &reply)
 		if ok && reply.Err != rpc.ErrWrongLeader {
 			if reply.Err == rpc.ErrVersion {
+				DebugPrint(dSetData, "S%d called setData on %v with  data %v and version %v, got error %v", ck.id, path, data, version, rpc.ErrMaybe)
 				return rpc.ErrMaybe
 			}
+			DebugPrint(dSetData, "S%d called setData on %v with  data %v and version %v, got error %v", ck.id, data, version, reply.Err)
 			return reply.Err
 		}
 		ck.incrementLeader()
@@ -208,9 +219,11 @@ func (ck *Session) GetChildren(path rpc.Ppath, watch rpc.Watch) ([]rpc.Ppath, rp
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.GetChildren", &args, &reply)
 		if ok && reply.Err != rpc.ErrWrongLeader {
 			if watch.ShouldWatch {
+				DebugPrint(dWatch, "S%d setting a children watch on %v with id %d", ck.id, path, reply.WatchId)
 				go ck.WatchWait(reply.WatchId, watch.Callback)
 			}
 
+			DebugPrint(dGetChildren, "S%d called getChildren on %v with got children %v and error %v with watchId %d", ck.id, path, reply.Children, reply.Err, reply.WatchId)
 			return reply.Children, reply.Err
 		}
 		ck.incrementLeader()
@@ -230,6 +243,7 @@ func (ck *Session) EndSession() {
 	for {
 		reply := rpc.EndSessionReply{}
 		leader := ck.getLeader()
+		DebugPrint(dEndSession, "S%d ended by client", ck.id)
 		ok := ck.clnt.Call(ck.servers[leader], "PanServer.EndSession", &args, &reply)
 		if ok && reply.Err != rpc.ErrWrongLeader {
 			return

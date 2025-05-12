@@ -4,29 +4,30 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"pan/panapi/rpc"
 	"strconv"
+	"strings"
 	"time"
 )
 
 type logTopic string
 
 const (
-	dClient  logTopic = "CLNT"
-	dCommit  logTopic = "CMIT"
-	dDrop    logTopic = "DROP"
-	dError   logTopic = "ERRO"
-	dInfo    logTopic = "INFO"
-	dLeader  logTopic = "LEAD"
-	dLog     logTopic = "LOG1"
-	dLog2    logTopic = "LOG2"
-	dPersist logTopic = "PERS"
-	dSnap    logTopic = "SNAP"
-	dTerm    logTopic = "TERM"
-	dTest    logTopic = "TEST"
-	dTimer   logTopic = "TIMR"
-	dTrace   logTopic = "TRCE"
-	dVote    logTopic = "VOTE"
-	dWarn    logTopic = "WARN"
+	dCreate      logTopic = "CRTE" // dClient  logTopic = "CLNT"
+	dDelete      logTopic = "DLTE" // dCommit  logTopic = "CMIT"
+	dExists      logTopic = "EXST" // dDrop    logTopic = "DROP"
+	dGetData     logTopic = "GETD" // dLeader  logTopic = "LEAD"
+	dError       logTopic = "ERRO"
+	dSetData     logTopic = "SETD" // dInfo    logTopic = "INFO"
+	dGetChildren logTopic = "GETC" // dLog     logTopic = "LOG1"
+	dWatch       logTopic = "WATC" // dLog2        logTopic = "LOG2"
+	dEndSession  logTopic = "ENDS" // dPersist     logTopic = "PERS"
+	dTimeout     logTopic = "TIME" // dSnap        logTopic = "SNAP"
+	dEphemeral   logTopic = "DEPH" // dTerm        logTopic = "TERM"
+	dTest        logTopic = "TEST"
+	dTimer       logTopic = "TIMR"
+	dTrace       logTopic = "TRCE"
+	dWarn        logTopic = "WARN"
 )
 
 // Retrieve the verbosity level from an environment variable
@@ -61,4 +62,20 @@ func DebugPrint(topic logTopic, format string, a ...interface{}) {
 		format = prefix + format
 		log.Printf(format, a...)
 	}
+}
+
+func PrintFlags(flags rpc.Flag) string {
+	output := []string{}
+	if flags.Ephemeral {
+		output = append(output, "EPH")
+	}
+	if flags.Sequential {
+		output = append(output, "SEQ")
+	}
+	outStr := strings.Join(output, ", ")
+	if outStr == "" {
+		return outStr
+	}
+	return "(" + outStr + ")"
+
 }

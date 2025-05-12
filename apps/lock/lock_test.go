@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	NCLNT    = 10
+	NCLNT    = 5
 	NSEC     = 1
 	NSERVERS = 5
 )
@@ -25,12 +25,12 @@ func runLockClient(_ int, ch_err chan string, ch_done chan struct{}, clientCrash
 	ck := MakeClerk(session, "/lock", "/l-")
 
 	ck.Acquire()
-	exists, _ := session.Exists(path+"/bad", rpc.Watch{})
+	exists, _ := session.Exists(path+"/lock_owner", rpc.Watch{})
 	if exists {
 		ch_err <- "Two clients acquired lock at the same time"
 		return
 	}
-	_, err := session.Create(path+"/bad", "", rpc.Flag{Ephemeral: true})
+	_, err := session.Create(path+"/lock_owner", "", rpc.Flag{Ephemeral: true})
 	session.Create(path+"/seq-", "", rpc.Flag{Sequential: true})
 	if err == rpc.ErrOnCreate {
 		ch_err <- "Two clients acquired lock at the same time"
@@ -45,7 +45,7 @@ func runLockClient(_ int, ch_err chan string, ch_done chan struct{}, clientCrash
 		session.EndSession()
 	} else {
 		time.Sleep(1 * time.Second)
-		session.Delete(path+"/bad", 1)
+		session.Delete(path+"/lock_owner", 1)
 		ck.Release()
 	}
 

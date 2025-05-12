@@ -1,0 +1,295 @@
+Test: leader crashes, client restarts, many clients (TestManyClientsBothClientAndLeaderCrash) (reliable network)...
+028328 CRTE S2 created znode /lock/l-1 (EPH, SEQ)
+028329 CRTE S1 created znode /lock/l-0 (EPH, SEQ)
+028518 GETC S2 called getChildren on /lock with got children [l-0 l-1] and error OK with watchId 0
+028519 GETC S1 called getChildren on /lock with got children [l-0 l-1] and error OK with watchId 0
+028719 EXST S1 called exists on znode /tester/lock_owner, got result false and watchId 0
+028722 WATC S2 setting an exists watch on /lock/l-0 with id 0
+028762 EXST S2 called exists on znode /lock/l-0, got result true and watchId 0
+028916 CRTE S3 created znode /lock/l-3 (EPH, SEQ)
+028921 CRTE S4 created znode /lock/l-2 (EPH, SEQ)
+028926 CRTE S1 created znode /tester/lock_owner (EPH)
+028928 CRTE S5 created znode /lock/l-4 (EPH, SEQ)
+029144 GETC S4 called getChildren on /lock with got children [l-0 l-1 l-2 l-3 l-4] and error OK with watchId 0
+029153 GETC S3 called getChildren on /lock with got children [l-0 l-1 l-2 l-3 l-4] and error OK with watchId 0
+029179 GETC S5 called getChildren on /lock with got children [l-0 l-1 l-2 l-3 l-4] and error OK with watchId 0
+029363 WATC S3 setting an exists watch on /lock/l-2 with id 1
+029364 EXST S3 called exists on znode /lock/l-2, got result true and watchId 1
+029363 CRTE S1 created znode /tester/seq-0 (SEQ)
+029364 WATC S4 setting an exists watch on /lock/l-1 with id 3
+029365 EXST S4 called exists on znode /lock/l-1, got result true and watchId 3
+029364 WATC S5 setting an exists watch on /lock/l-3 with id 2
+029365 EXST S5 called exists on znode /lock/l-3, got result true and watchId 2
+039372 ENDS S1 ended by client
+039591 DEPH S0 deleting ephemeral znode /lock/l-0 from session 1
+039591 DEPH S0 deleting ephemeral znode /lock/l-0 from session 1
+039591 DEPH S0 deleting ephemeral znode /lock/l-0 from session 1
+039591 DEPH S0 deleting ephemeral znode /lock/l-0 from session 1
+039630 WATC S0 firing watch on /lock/l-0
+039631 WATC S0 firing watch on /lock/l-0
+039633 WATC S0 firing watch on /lock/l-0
+039634 WATC S0 firing watch on /lock/l-0
+039679 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 1
+039610 DEPH S0 deleting ephemeral znode /lock/l-0 from session 1
+039682 WATC S0 firing watch on /lock/l-0
+039683 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 1
+039682 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 1
+039684 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 1
+039679 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 1
+039710 WATC S2 received a watch trigger on watch 0
+039903 GETC S2 called getChildren on /lock with got children [l-1 l-2 l-3 l-4] and error OK with watchId 0
+040113 EXST S2 called exists on znode /tester/lock_owner, got result false and watchId 0
+040322 TIME S0 ending session 1 due to timeout
+040322 TIME S0 ending session 1 due to timeout
+040322 TIME S0 ending session 1 due to timeout
+040324 CRTE S2 created znode /tester/lock_owner (EPH)
+040322 TIME S0 ending session 1 due to timeout
+040322 TIME S0 ending session 1 due to timeout
+040762 CRTE S2 created znode /tester/seq-1 (SEQ)
+077461 DEPH S0 deleting ephemeral znode /lock/l-0 from session 1
+077466 WATC S0 firing watch on /lock/l-0
+077461 DEPH S0 deleting ephemeral znode /lock/l-0 from session 1
+077468 WATC S0 firing watch on /lock/l-0
+077468 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 1
+077467 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 1
+077470 TIME S0 ending session 1 due to timeout
+077482 TIME S0 ending session 1 due to timeout
+077485 DEPH S0 deleting ephemeral znode /lock/l-0 from session 1
+077486 WATC S0 firing watch on /lock/l-0
+077487 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 1
+077488 TIME S0 ending session 1 due to timeout
+077549 DEPH S0 deleting ephemeral znode /lock/l-0 from session 1
+077551 WATC S0 firing watch on /lock/l-0
+077551 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 1
+077552 TIME S0 ending session 1 due to timeout
+077552 DEPH S0 deleting ephemeral znode /lock/l-0 from session 1
+077555 WATC S0 firing watch on /lock/l-0
+077555 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 1
+077556 TIME S0 ending session 1 due to timeout
+090747 TIME S0 ending session 2 due to timeout
+090748 TIME S0 ending session 2 due to timeout
+090749 DEPH S0 deleting ephemeral znode /lock/l-1 from session 2
+090758 WATC S0 firing watch on /lock/l-1
+090758 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 2
+090755 DEPH S0 deleting ephemeral znode /lock/l-1 from session 2
+090760 WATC S0 firing watch on /lock/l-1
+090761 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 2
+090819 TIME S0 ending session 2 due to timeout
+090820 DEPH S0 deleting ephemeral znode /lock/l-1 from session 2
+090821 WATC S0 firing watch on /lock/l-1
+090821 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 2
+090823 TIME S0 ending session 2 due to timeout
+090823 DEPH S0 deleting ephemeral znode /lock/l-1 from session 2
+090824 WATC S0 firing watch on /lock/l-1
+090824 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 2
+090824 TIME S0 ending session 2 due to timeout
+090824 DEPH S0 deleting ephemeral znode /lock/l-1 from session 2
+090825 WATC S0 firing watch on /lock/l-1
+090825 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 2
+090827 WATC S4 received a watch trigger on watch 3
+091032 GETC S4 called getChildren on /lock with got children [l-2 l-3 l-4] and error OK with watchId 0
+091231 EXST S4 called exists on znode /tester/lock_owner, got result false and watchId 0
+091449 CRTE S4 created znode /tester/lock_owner (EPH)
+091847 CRTE S4 created znode /tester/seq-2 (SEQ)
+125745 DEPH S0 deleting ephemeral znode /lock/l-0 from session 1
+125746 DEPH S0 deleting ephemeral znode /lock/l-0 from session 1
+125746 WATC S0 firing watch on /lock/l-0
+125747 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 1
+125745 DEPH S0 deleting ephemeral znode /lock/l-0 from session 1
+125748 WATC S0 firing watch on /lock/l-0
+125748 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 1
+125746 WATC S0 firing watch on /lock/l-0
+125746 DEPH S0 deleting ephemeral znode /lock/l-0 from session 1
+125747 TIME S0 ending session 1 due to timeout
+125749 TIME S0 ending session 1 due to timeout
+125749 WATC S0 firing watch on /lock/l-0
+125751 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 1
+125752 TIME S0 ending session 1 due to timeout
+125752 TIME S0 ending session 2 due to timeout
+125752 DEPH S0 deleting ephemeral znode /lock/l-1 from session 2
+125752 WATC S0 firing watch on /lock/l-1
+125753 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 2
+125752 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 1
+125752 TIME S0 ending session 2 due to timeout
+125754 DEPH S0 deleting ephemeral znode /lock/l-1 from session 2
+125753 TIME S0 ending session 1 due to timeout
+125754 TIME S0 ending session 2 due to timeout
+125755 DEPH S0 deleting ephemeral znode /lock/l-1 from session 2
+125756 WATC S0 firing watch on /lock/l-1
+125756 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 2
+125756 WATC S0 firing watch on /lock/l-1
+125757 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 2
+125756 TIME S0 ending session 2 due to timeout
+125757 DEPH S0 deleting ephemeral znode /lock/l-1 from session 2
+125757 WATC S0 firing watch on /lock/l-1
+125758 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 2
+125756 DEPH S0 deleting ephemeral znode /lock/l-0 from session 1
+125758 WATC S0 firing watch on /lock/l-0
+125758 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 1
+125758 TIME S0 ending session 1 due to timeout
+125761 TIME S0 ending session 2 due to timeout
+125761 DEPH S0 deleting ephemeral znode /lock/l-1 from session 2
+125761 WATC S0 firing watch on /lock/l-1
+125761 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 2
+142257 TIME S0 ending session 4 due to timeout
+142260 DEPH S0 deleting ephemeral znode /lock/l-2 from session 4
+142261 WATC S0 firing watch on /lock/l-2
+142262 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 4
+142265 WATC S3 received a watch trigger on watch 1
+142360 TIME S0 ending session 4 due to timeout
+142362 DEPH S0 deleting ephemeral znode /lock/l-2 from session 4
+142363 WATC S0 firing watch on /lock/l-2
+142363 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 4
+142370 TIME S0 ending session 4 due to timeout
+142370 DEPH S0 deleting ephemeral znode /lock/l-2 from session 4
+142371 WATC S0 firing watch on /lock/l-2
+142371 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 4
+142376 TIME S0 ending session 4 due to timeout
+142377 DEPH S0 deleting ephemeral znode /lock/l-2 from session 4
+142377 WATC S0 firing watch on /lock/l-2
+142377 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 4
+142382 TIME S0 ending session 4 due to timeout
+142383 DEPH S0 deleting ephemeral znode /lock/l-2 from session 4
+142383 WATC S0 firing watch on /lock/l-2
+142383 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 4
+142467 GETC S3 called getChildren on /lock with got children [l-3 l-4] and error OK with watchId 0
+142876 EXST S3 called exists on znode /tester/lock_owner, got result false and watchId 0
+143079 CRTE S3 created znode /tester/lock_owner (EPH)
+143704 CRTE S3 created znode /tester/seq-3 (SEQ)
+153709 ENDS S3 ended by client
+154009 DEPH S0 deleting ephemeral znode /lock/l-3 from session 3
+154026 WATC S0 firing watch on /lock/l-3
+154027 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 3
+154034 WATC S5 received a watch trigger on watch 2
+154087 DEPH S0 deleting ephemeral znode /lock/l-3 from session 3
+154088 WATC S0 firing watch on /lock/l-3
+154088 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 3
+154092 DEPH S0 deleting ephemeral znode /lock/l-3 from session 3
+154095 WATC S0 firing watch on /lock/l-3
+154120 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 3
+154123 DEPH S0 deleting ephemeral znode /lock/l-3 from session 3
+154123 WATC S0 firing watch on /lock/l-3
+154123 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 3
+154128 DEPH S0 deleting ephemeral znode /lock/l-3 from session 3
+154129 WATC S0 firing watch on /lock/l-3
+154129 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 3
+154415 GETC S5 called getChildren on /lock with got children [l-4] and error OK with watchId 0
+154651 EXST S5 called exists on znode /tester/lock_owner, got result false and watchId 0
+155034 TIME S0 ending session 3 due to timeout
+155036 CRTE S5 created znode /tester/lock_owner (EPH)
+155110 TIME S0 ending session 3 due to timeout
+155133 TIME S0 ending session 3 due to timeout
+155133 TIME S0 ending session 3 due to timeout
+155134 TIME S0 ending session 3 due to timeout
+155660 CRTE S5 created znode /tester/seq-4 (SEQ)
+165671 ENDS S5 ended by client
+167018 ENDS S5 ended by client
+168517 ENDS S5 ended by client
+170041 ENDS S5 ended by client
+171072 ENDS S5 ended by client
+172103 ENDS S5 ended by client
+173131 ENDS S5 ended by client
+174162 ENDS S5 ended by client
+175213 ENDS S5 ended by client
+176243 ENDS S5 ended by client
+177265 ENDS S5 ended by client
+177928 DEPH S0 deleting ephemeral znode /lock/l-0 from session 1
+177927 DEPH S0 deleting ephemeral znode /lock/l-0 from session 1
+177929 WATC S0 firing watch on /lock/l-0
+177930 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 1
+177929 WATC S0 firing watch on /lock/l-0
+177930 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 1
+177930 TIME S0 ending session 1 due to timeout
+177931 TIME S0 ending session 1 due to timeout
+177931 DEPH S0 deleting ephemeral znode /lock/l-0 from session 1
+177932 WATC S0 firing watch on /lock/l-0
+177932 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 1
+177932 TIME S0 ending session 1 due to timeout
+177933 TIME S0 ending session 2 due to timeout
+177933 DEPH S0 deleting ephemeral znode /lock/l-1 from session 2
+177933 WATC S0 firing watch on /lock/l-1
+177933 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 2
+177933 TIME S0 ending session 2 due to timeout
+177935 DEPH S0 deleting ephemeral znode /lock/l-1 from session 2
+177935 WATC S0 firing watch on /lock/l-1
+177935 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 2
+177935 TIME S0 ending session 4 due to timeout
+177936 DEPH S0 deleting ephemeral znode /lock/l-2 from session 4
+177936 WATC S0 firing watch on /lock/l-2
+177936 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 4
+177934 TIME S0 ending session 2 due to timeout
+177936 DEPH S0 deleting ephemeral znode /lock/l-1 from session 2
+177936 WATC S0 firing watch on /lock/l-1
+177937 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 2
+177937 TIME S0 ending session 4 due to timeout
+177937 DEPH S0 deleting ephemeral znode /lock/l-2 from session 4
+177937 WATC S0 firing watch on /lock/l-2
+177937 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 4
+177936 DEPH S0 deleting ephemeral znode /lock/l-0 from session 1
+177938 WATC S0 firing watch on /lock/l-0
+177937 DEPH S0 deleting ephemeral znode /lock/l-3 from session 3
+177938 WATC S0 firing watch on /lock/l-3
+177937 DEPH S0 deleting ephemeral znode /lock/l-0 from session 1
+177938 WATC S0 firing watch on /lock/l-0
+177939 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 1
+177938 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 1
+177939 TIME S0 ending session 1 due to timeout
+177939 TIME S0 ending session 1 due to timeout
+177938 DEPH S0 deleting ephemeral znode /lock/l-3 from session 3
+177940 WATC S0 firing watch on /lock/l-3
+177940 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 3
+177938 TIME S0 ending session 4 due to timeout
+177940 DEPH S0 deleting ephemeral znode /lock/l-2 from session 4
+177940 WATC S0 firing watch on /lock/l-2
+177941 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 4
+177938 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 3
+177941 TIME S0 ending session 2 due to timeout
+177941 DEPH S0 deleting ephemeral znode /lock/l-1 from session 2
+177941 WATC S0 firing watch on /lock/l-1
+177941 DEPH S0 deleting ephemeral znode /lock/l-3 from session 3
+177942 WATC S0 firing watch on /lock/l-3
+177942 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 3
+177940 TIME S0 ending session 3 due to timeout
+177942 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 2
+177941 TIME S0 ending session 2 due to timeout
+177943 DEPH S0 deleting ephemeral znode /lock/l-1 from session 2
+177941 TIME S0 ending session 3 due to timeout
+177942 TIME S0 ending session 3 due to timeout
+177943 WATC S0 firing watch on /lock/l-1
+177944 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 2
+177944 TIME S0 ending session 4 due to timeout
+177944 DEPH S0 deleting ephemeral znode /lock/l-2 from session 4
+177944 WATC S0 firing watch on /lock/l-2
+177945 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 4
+177945 TIME S0 ending session 4 due to timeout
+177945 DEPH S0 deleting ephemeral znode /lock/l-3 from session 3
+177946 WATC S0 firing watch on /lock/l-3
+177946 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 3
+177945 DEPH S0 deleting ephemeral znode /lock/l-2 from session 4
+177946 TIME S0 ending session 3 due to timeout
+177946 WATC S0 firing watch on /lock/l-2
+177947 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 4
+177948 DEPH S0 deleting ephemeral znode /lock/l-3 from session 3
+177948 WATC S0 firing watch on /lock/l-3
+177948 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 3
+177948 TIME S0 ending session 3 due to timeout
+178334 ENDS S5 ended by client
+178562 DEPH S0 deleting ephemeral znode /lock/l-4 from session 5
+178564 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 5
+178563 DEPH S0 deleting ephemeral znode /lock/l-4 from session 5
+178565 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 5
+178563 DEPH S0 deleting ephemeral znode /lock/l-4 from session 5
+178565 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 5
+178571 DEPH S0 deleting ephemeral znode /lock/l-4 from session 5
+178576 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 5
+178587 DEPH S0 deleting ephemeral znode /lock/l-4 from session 5
+178589 DEPH S0 deleting ephemeral znode /tester/lock_owner from session 5
+179171 TIME S0 ending session 5 due to timeout
+179199 TIME S0 ending session 5 due to timeout
+179199 TIME S0 ending session 5 due to timeout
+179205 TIME S0 ending session 5 due to timeout
+179207 TIME S0 ending session 5 due to timeout
+210382 CRTE S0 created znode /tester/seq-5 (SEQ)
+  ... Passed --  time 21.0s #peers 5 #RPCs  5850 #Ops    0
+PASS
+ok  	pan/apps/lock	21.392s
