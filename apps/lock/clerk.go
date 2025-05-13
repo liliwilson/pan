@@ -31,8 +31,8 @@ func isSmallestSequence(children []rpc.Ppath, candidate rpc.Ppath) bool {
 }
 
 // Returns the sequence number of the node that a client that created fname should be watching
-func watchNode(children []rpc.Ppath, fname rpc.Ppath) int {
-	myNum := fname.GetSeqNumber()
+func (ck *Clerk) watchNode(children []rpc.Ppath) rpc.Ppath {
+	myNum := ck.currentFile.GetSeqNumber()
 	current := -1
 	for _, child := range children {
 		childNum := child.GetSeqNumber()
@@ -42,19 +42,20 @@ func watchNode(children []rpc.Ppath, fname rpc.Ppath) int {
 			current = max(current, childNum)
 		}
 	}
-	return current
+	return rpc.Ppath(strconv.Itoa(current))
 }
 
 // Acquire the lock for the fs
 func (ck *Clerk) Acquire() {
-	fname, _ := ck.session.Create(ck.lockDir+ck.lockSuffix, "", rpc.Flag{Sequential: true, Ephemeral: true})
+	lockPrefix := ck.lockDir + ck.lockSuffix
+	fname, _ := ck.session.Create(lockPrefix, "", rpc.Flag{Sequential: true, Ephemeral: true})
 	ck.currentFile = fname
 	for {
-		children, _ := ck.session.GetChildren(ck.lockDir, rpc.Watch{ShouldWatch: false, Callback: rpc.EmptyWatch})
+		children, _ := ck.session.GetChildren(ck.lockDir, rpc.Watch{})
 		if isSmallestSequence(children, fname) {
 			return
 		} else {
-			shouldWatch := ck.lockDir + ck.lockSuffix + rpc.Ppath(strconv.Itoa(watchNode(children, fname)))
+			shouldWatch := lockPrefix + ck.watchNode(children)
 			ch_wait := make(chan struct{})
 			exists, _ := ck.session.Exists(shouldWatch, rpc.Watch{ShouldWatch: true, Callback: func(_ rpc.WatchArgs) {
 				ch_wait <- struct{}{}
