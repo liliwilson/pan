@@ -52,7 +52,7 @@ func (ck *Clerk) Acquire() {
 	ck.currentFile = fname
 	for {
 		children, _ := ck.session.GetChildren(ck.lockDir, rpc.Watch{})
-		if isSmallestSequence(children, fname) {
+		if isSmallestSequence(children, ck.currentFile) {
 			return
 		} else {
 			shouldWatch := lockPrefix + ck.watchNode(children)
